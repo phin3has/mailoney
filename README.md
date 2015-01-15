@@ -22,7 +22,7 @@ python mailoney.py -s mailbox -i 10.10.10.1 -p 990 -t postfix_creds
 ```
 
 # ToDo 
- [ ] Add modules for EXIM, Microsoft, others
- [ ] Build in Error Handling
- [ ] Add a Daemon flag to background process.
+ - [ ] Add modules for EXIM, Microsoft, others
+ - [ ] Build in Error Handling
+ - [ ] Add a Daemon flag to background process.
 
