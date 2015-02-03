@@ -7,6 +7,7 @@ add some nice comments here
 
 import argparse
 import sys
+import os
 import modules.postfix_creds
 import modules.open_relay
 
@@ -28,6 +29,10 @@ banner = ('''
 \tMailoney - A Simple SMTP Honeypot - Version: {}
 ****************************************************************
 '''.format(__version__))
+
+#create log directory (thanks @Bifrozt_Dev)
+if not os.path.isdir('logs'):
+        os.mkdir('logs')
 
 #call server type module, based on parsed arguments
 if args.t == 'postfix_creds':
