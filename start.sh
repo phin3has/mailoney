@@ -35,3 +35,4 @@ script_arguments=$@
 echo "Starting mailoney in the background...\n"
 cd $(dirname $0)
 su mailoney -c "nohup authbind --deep python mailoney.py $script_arguments > $(dirname $0)/logs/mailoney.out &"
+#There might be a better way to manage the background execution (on mailoney.py directly). nohup seems to have side effects on the logs.
