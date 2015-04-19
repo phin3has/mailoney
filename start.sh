@@ -7,7 +7,7 @@ if [[ $USER != "root" ]]; then
 fi
 
 display_usage() {
-    echo -e "\nUsage: start.sh -s <fake mailserver name> -t <honeypot type> [Optional arguments]\n"
+    echo -e "\nUsage: start.sh -s <fake mailserver name> -t <honeypot type> [Optional arguments] \n"
     echo "-s <fake mailserver name>	The name that will show up as the mail server name. (Example: -s mailserver)"
     echo "-t <honeypot type>		HoneyPot type. Choices:"
 	echo "    postfix_creds 	Emulates PostFix authentication server, collects credentials"
