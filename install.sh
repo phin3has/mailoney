@@ -4,7 +4,7 @@ set -e
 set -x
 
 apt-get update
-apt-get -y install python2.7 git authbind
+apt-get -y install python2.7 git authbind sudo
 
 # Create Mailoney user
 useradd -d /home/mailoney -s /bin/bash -m mailoney -g users
