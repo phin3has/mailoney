@@ -298,8 +298,8 @@ def module():
             #setup the Log File
             log_to_file("logs/mail.log", peer[0], peer[1], '')
             log_to_file("logs/mail.log", peer[0], peer[1], '*' * 50)
-            log_to_file("logs/mail.log", peer[0], peer[1], 'Mail to: {0}'.format(mailfrom))
-            log_to_file("logs/mail.log", peer[0], peer[1], 'Mail from: {0}'.format(", ".join(rcpttos)))
+            log_to_file("logs/mail.log", peer[0], peer[1], 'Mail from: {0}'.format(mailfrom))
+            log_to_file("logs/mail.log", peer[0], peer[1], 'Mail to: {0}'.format(", ".join(rcpttos)))
             log_to_file("logs/mail.log", peer[0], peer[1], 'Data:')
             log_to_file("logs/mail.log", peer[0], peer[1], data)
 
