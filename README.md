@@ -1,6 +1,11 @@
 # About
 Mailoney is a SMTP Honeypot I wrote just to have fun learning Python. The Open Relay module emulates an Open Relay and writes attempted emails to a log file. Similarly, the Authentication modules will capture credentials and write those to a log file. 
 
+# Install
+
+# Dangerzone
+
+
 # Usage
 
 You'll likely need to run this with elevated permissions as required to open sockets on special ports.
