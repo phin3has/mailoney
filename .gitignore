@@ -1,0 +1,6 @@
+# Byte-Compiled 
+__pycache__/
+*.py[cod]
+
+logs/
+*.db
