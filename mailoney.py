@@ -7,7 +7,7 @@ add some nice comments here
 
 import argparse
 import os
-
+import hpfeeds
 import modules.postfix_creds
 import modules.open_relay
 import modules.schizo_open_relay
@@ -32,12 +32,26 @@ bind_ip = args.i
 bind_port = int(args.p)
 srvname = args.s
 
-# set hpfeeds related data
-hpfeeds_server=""
-hpfeeds_port=int(args.hpfport)
-hpfeeds_ident=args.hpfident
-hpfeeds_secret=args.hpfsecret
-hpfeeds_prefix=args.hpfchannelprefix
+
+
+def connect_hpfeeds():
+    # set hpfeeds related data
+    hpfeeds_server = args.hpfserver
+    hpfeeds_port = int(args.hpfport)
+    hpfeeds_ident = args.hpfident
+    hpfeeds_secret = args.hpfsecret
+    hpfeeds_prefix = args.hpfchannelprefix
+
+    if hpfeeds_server and hpfeeds_port and hpfeeds_ident and hpfeeds_secret and hpfeeds_prefix:
+        try:
+            hpc = hpfeeds.new(hpfeeds_server, hpfeeds_port, hpfeeds_ident, hpfeeds_secret)
+            return hpc, hpfeeds_prefix
+        except (hpfeeds.FeedException, socket.error, hpfeeds.Disconnect), e:
+            print "not successful"
+            logger.warn('Exception while connecting: {0}'.format(e))
+    return False, False
+
+
 
 
 if __name__ == "__main__":

@@ -13,13 +13,13 @@ import threading
 import asyncore
 import asynchat
 
-import hpfeeds
 import json
 
 sys.path.append("../")
 import mailoney
 
 output_lock = threading.RLock()
+hpc,hpfeeds_prefix = mailoney.connect_hpfeeds()
 
 def log_to_file(file_path, ip, port, data):
     with output_lock:
@@ -29,24 +29,10 @@ def log_to_file(file_path, ip, port, data):
             f.write(message + "\n")
 
 def log_to_hpfeeds(channel, data):
-    if mailoney.hpfeeds_server:
-        try:
-            hpc = hpfeeds.new(mailoney.hpfeeds_server, mailoney.hpfeeds_port, mailoney.hpfeeds_ident, mailoney.hpfeeds_secret)
-        except hpfeeds.FeedException, e:
-            return False
-
-        message = data
-        hpfchannel=mailoney.hpfeeds_prefix+"."+channel
-
-        hpc.publish(hpfchannel, message)
-
-        emsg = hpc.wait()
-
-        if emsg:
-            print("[*] hpfeeds: ", "HPFeeds Error (%s)" % format(emsg))
-            return False
-
-        return True
+        if hpc:
+            message = data
+            hpfchannel=hpfeeds_prefix+"."+channel
+            hpc.publish(hpfchannel, message)
 
 
 
@@ -345,7 +331,6 @@ def module():
 
 
     def run():
-
         honeypot = SchizoOpenRelay((mailoney.bind_ip, mailoney.bind_port), None)
         print '[*] Mail Relay listening on {}:{}'.format(mailoney.bind_ip, mailoney.bind_port)
         try:
