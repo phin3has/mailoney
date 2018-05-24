@@ -51,7 +51,7 @@ def connect_hpfeeds():
             hpc = hpfeeds.new(hpfeeds_server, hpfeeds_port, hpfeeds_ident, hpfeeds_secret)
             return hpc, hpfeeds_prefix
         except (hpfeeds.FeedException, socket.error, hpfeeds.Disconnect), e:
-            print "not successful"
+            print "hpfeeds connection not successful"
             logger.warn('Exception while connecting: {0}'.format(e))
     return False, False
 
