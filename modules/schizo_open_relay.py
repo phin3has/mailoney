@@ -34,8 +34,6 @@ def log_to_hpfeeds(channel, data):
             hpfchannel=hpfeeds_prefix+"."+channel
             hpc.publish(hpfchannel, message)
 
-
-
 def process_packet_for_shellcode(packet, ip, port):
     if libemu is None:
         return
@@ -43,10 +41,10 @@ def process_packet_for_shellcode(packet, ip, port):
     r = emulator.test(packet)
     if r is not None:
         # we have shellcode
-        log_to_file("logs/shellcode.log", ip, port, "We have some shellcode")
-        #log_to_file("logs/shellcode.log", ip, port, emulator.emu_profile_output)
-        #log_to_hpfeeds("shellcode", ip, port, emulator.emu_profile_output)
-        log_to_file("logs/shellcode.log", ip, port, packet)
+        log_to_file(mailoney.logpath+"/shellcode.log", ip, port, "We have some shellcode")
+        #log_to_file(mailoney.logpath+"/shellcode.log", ip, port, emulator.emu_profile_output)
+        #log_to_hpfeeds("/shellcode", ip, port, emulator.emu_profile_output)
+        log_to_file(mailoney.logpath+"/shellcode.log", ip, port, packet)
         log_to_hpfeeds("shellcode",  json.dumps({ "Timestamp":format(time.time()), "ServerName": self.__fqdn, "SrcIP": self.__addr[0], "SrcPort": self.__addr[1],"Shellcode" :packet}))
 
 
@@ -103,7 +101,7 @@ class SMTPChannel(asynchat.async_chat):
     # Implementation of base class abstract method
     def found_terminator(self):
         line = EMPTYSTRING.join(self.__line)
-        log_to_file("logs/commands.log", self.__addr[0], self.__addr[1], line.encode('string-escape'))
+        log_to_file(mailoney.logpath+"/commands.log", self.__addr[0], self.__addr[1], line.encode('string-escape'))
         log_to_hpfeeds("commands",  json.dumps({ "Timestamp":format(time.time()), "ServerName": self.__fqdn, "SrcIP": self.__addr[0], "SrcPort": self.__addr[1],"Commmand" : line.encode('string-escape')}))
 
         #print >> DEBUGSTREAM, 'Data:', repr(line)
@@ -312,12 +310,12 @@ def module():
 
         def process_message(self, peer, mailfrom, rcpttos, data):
             #setup the Log File
-            log_to_file("logs/mail.log", peer[0], peer[1], '')
-            log_to_file("logs/mail.log", peer[0], peer[1], '*' * 50)
-            log_to_file("logs/mail.log", peer[0], peer[1], 'Mail from: {0}'.format(mailfrom))
-            log_to_file("logs/mail.log", peer[0], peer[1], 'Mail to: {0}'.format(", ".join(rcpttos)))
-            log_to_file("logs/mail.log", peer[0], peer[1], 'Data:')
-            log_to_file("logs/mail.log", peer[0], peer[1], data)
+            log_to_file(mailoney.logpath+"/mail.log", peer[0], peer[1], '')
+            log_to_file(mailoney.logpath+"/mail.log", peer[0], peer[1], '*' * 50)
+            log_to_file(mailoney.logpath+"/mail.log", peer[0], peer[1], 'Mail from: {0}'.format(mailfrom))
+            log_to_file(mailoney.logpath+"/mail.log", peer[0], peer[1], 'Mail to: {0}'.format(", ".join(rcpttos)))
+            log_to_file(mailoney.logpath+"/mail.log", peer[0], peer[1], 'Data:')
+            log_to_file(mailoney.logpath+"/mail.log", peer[0], peer[1], data)
 
             loghpfeeds = {}
             loghpfeeds['ServerName'] = mailoney.srvname

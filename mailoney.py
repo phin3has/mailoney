@@ -19,6 +19,7 @@ parser.add_argument('-i',action='store', metavar='<ip address>', default='0.0.0.
 parser.add_argument('-p',action='store', metavar='<port>',  default='25', help='The port to listen on')
 parser.add_argument('-s',action='store', metavar='mailserver', default=os.environ.get('MAILSERVER_NAME', None), help='A Name that\'ll show up as the mail server name')
 parser.add_argument('-t',action='store', choices=['open_relay', 'postfix_creds', 'schizo_open_relay'], required=True, help='honeypot type')
+parser.add_argument('-logpath',action='store', metavar='<logpath>',  default=os.environ.get('LOGPATH'), help='path for file logging')
 parser.add_argument('-hpfserver', action='store', metavar='<hpfeeds-server>', default=os.environ.get('HPFEEDS_SERVER', None), help='HPFeeds Server')
 parser.add_argument('-hpfport', action='store', metavar='<hpfeeds-port>', default=os.environ.get('HPFEEDS_PORT', None), help='HPFeeds Port')
 parser.add_argument('-hpfident', action='store', metavar='<hpfeeds-ident>', default=os.environ.get('HPFEEDS_IDENT', None), help='HPFeeds Username')
@@ -27,12 +28,15 @@ parser.add_argument('-hpfchannelprefix', action='store', metavar='<hpfeeds-chann
 
 args = parser.parse_args()
 
+# set own logpath
+logpath="./logs/"
+if args.logpath:
+    logpath=args.logpath
+
 # set the IP address variables
 bind_ip = args.i
 bind_port = int(args.p)
 srvname = args.s
-
-
 
 def connect_hpfeeds():
     # set hpfeeds related data
@@ -52,8 +56,6 @@ def connect_hpfeeds():
     return False, False
 
 
-
-
 if __name__ == "__main__":
 
     banner = ('''
@@ -64,8 +66,8 @@ if __name__ == "__main__":
     print banner
 
     # create log directory (thanks @Bifrozt_Dev)
-    if not os.path.isdir('logs'):
-            os.mkdir('logs')
+    if not os.path.isdir(logpath):
+            os.mkdir(logpath)
 
     # call server type module, based on parsed arguments
     if args.t == 'postfix_creds':
