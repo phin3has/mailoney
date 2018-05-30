@@ -41,14 +41,14 @@ srvname = args.s
 def connect_hpfeeds():
     # set hpfeeds related data
     hpfeeds_server = args.hpfserver
-    hpfeeds_port = int(args.hpfport)
+    hpfeeds_port = args.hpfport
     hpfeeds_ident = args.hpfident
     hpfeeds_secret = args.hpfsecret
     hpfeeds_prefix = args.hpfchannelprefix
 
     if hpfeeds_server and hpfeeds_port and hpfeeds_ident and hpfeeds_secret and hpfeeds_prefix:
         try:
-            hpc = hpfeeds.new(hpfeeds_server, hpfeeds_port, hpfeeds_ident, hpfeeds_secret)
+            hpc = hpfeeds.new(hpfeeds_server, int(hpfeeds_port), hpfeeds_ident, hpfeeds_secret)
             return hpc, hpfeeds_prefix
         except (hpfeeds.FeedException, socket.error, hpfeeds.Disconnect), e:
             print "hpfeeds connection not successful"
