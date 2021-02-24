@@ -25,7 +25,7 @@ def log_to_file(file_path, ip, port, data):
     with output_lock:
         with open(file_path, "a") as f:
             message = "[{0}][{1}:{2}] {3}".format(time.time(), ip, port, data.encode("string-escape"))
-            print file_path + " " + message
+            print(file_path + " " + message)
             f.write(message + "\n")
 
 def log_to_hpfeeds(channel, data):
@@ -81,7 +81,7 @@ class SMTPChannel(asynchat.async_chat):
             if err[0] != errno.ENOTCONN:
                 raise
             return
-        #print >> DEBUGSTREAM, 'Peer:', repr(self.__peer)
+        #print(>> DEBUGSTREAM, 'Peer:', repr(self.__peer))
         self.push('220 %s %s' % (self.__fqdn, __version__))
         self.set_terminator('\r\n')
 
@@ -104,7 +104,7 @@ class SMTPChannel(asynchat.async_chat):
         log_to_file(mailoney.logpath+"/commands.log", self.__addr[0], self.__addr[1], line.encode('string-escape'))
         log_to_hpfeeds("commands",  json.dumps({ "Timestamp":format(time.time()), "ServerName": self.__fqdn, "SrcIP": self.__addr[0], "SrcPort": self.__addr[1],"Commmand" : line.encode('string-escape')}))
 
-        #print >> DEBUGSTREAM, 'Data:', repr(line)
+        #print(>> DEBUGSTREAM, 'Data:', repr(line))
         self.__line = []
         if self.__state == self.COMMAND:
             if not line:
@@ -200,7 +200,7 @@ class SMTPChannel(asynchat.async_chat):
         return address
 
     def smtp_MAIL(self, arg):
-        #print >> DEBUGSTREAM, '===> MAIL', arg
+        #print(>> DEBUGSTREAM, '===> MAIL', arg)
         address = self.__getaddr('FROM:', arg) if arg else None
         if not address:
             self.push('501 Syntax: MAIL FROM:<address>')
@@ -209,11 +209,11 @@ class SMTPChannel(asynchat.async_chat):
             self.push('503 Error: nested MAIL command')
             return
         self.__mailfrom = address
-        #print >> DEBUGSTREAM, 'sender:', self.__mailfrom
+        #print(>> DEBUGSTREAM, 'sender:', self.__mailfrom)
         self.push('250 Ok')
 
     def smtp_RCPT(self, arg):
-        #print >> DEBUGSTREAM, '===> RCPT', arg
+        #print(>> DEBUGSTREAM, '===> RCPT', arg)
         if not self.__mailfrom:
             self.push('503 Error: need MAIL command')
             return
@@ -222,7 +222,7 @@ class SMTPChannel(asynchat.async_chat):
             self.push('501 Syntax: RCPT TO: <address>')
             return
         self.__rcpttos.append(address)
-        #print >> DEBUGSTREAM, 'recips:', self.__rcpttos
+        #print(>> DEBUGSTREAM, 'recips:', self.__rcpttos)
         self.push('250 Ok')
 
     def smtp_RSET(self, arg):
@@ -265,13 +265,13 @@ class SMTPServer(asyncore.dispatcher):
             raise
         else:
             pass
-            #print >> DEBUGSTREAM, '%s started at %s\n\tLocal addr: %s\n\tRemote addr:%s' % (self.__class__.__name__, time.ctime(time.time()), localaddr, remoteaddr)
+            #print(>> DEBUGSTREAM, '%s started at %s\n\tLocal addr: %s\n\tRemote addr:%s' % (self.__class__.__name__, time.ctime(time.time()), localaddr, remoteaddr))
 
     def handle_accept(self):
         pair = self.accept()
         if pair is not None:
             conn, addr = pair
-            #print >> DEBUGSTREAM, 'Incoming connection from %s' % repr(addr)
+            #print(>> DEBUGSTREAM, 'Incoming connection from %s' % repr(addr))
             channel = SMTPChannel(self, conn, addr)
 
     def handle_close(self):
@@ -330,10 +330,10 @@ def module():
 
     def run():
         honeypot = SchizoOpenRelay((mailoney.bind_ip, mailoney.bind_port), None)
-        print '[*] Mail Relay listening on {}:{}'.format(mailoney.bind_ip, mailoney.bind_port)
+        print('[*] Mail Relay listening on {}:{}'.format(mailoney.bind_ip, mailoney.bind_port))
         try:
             asyncore.loop()
-            print "exiting for some unknown reason"
+            print("exiting for some unknown reason")
         except KeyboardInterrupt:
-            print 'Detected interruption, terminating...'
+            print('Detected interruption, terminating...')
     run()

@@ -50,8 +50,8 @@ def connect_hpfeeds():
         try:
             hpc = hpfeeds.new(hpfeeds_server, int(hpfeeds_port), hpfeeds_ident, hpfeeds_secret)
             return hpc, hpfeeds_prefix
-        except (hpfeeds.FeedException, socket.error, hpfeeds.Disconnect), e:
-            print "hpfeeds connection not successful"
+        except (hpfeeds.FeedException, socket.error, hpfeeds.Disconnect) as e:
+            print("hpfeeds connection not successful")
             logger.warn('Exception while connecting: {0}'.format(e))
     return False, False
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     \tMailoney - A Simple SMTP Honeypot - Version: {}
     ****************************************************************
     '''.format(__version__))
-    print banner
+    print(banner)
 
     # create log directory (thanks @Bifrozt_Dev)
     if not os.path.isdir(logpath):
@@ -77,5 +77,5 @@ if __name__ == "__main__":
     elif args.t == 'schizo_open_relay':
         modules.schizo_open_relay.module()
     else:
-        print 'I don\'t know what this module is...Exiting...\r\n'
+        print('I don\'t know what this module is...Exiting...\r\n')
 

@@ -14,7 +14,7 @@ def pfserver():
     sys.path.append("../")
     import mailoney
 
-    print mailoney.banner
+    print(mailoney.banner)
     # moving this below to see if this fixes the reconnection error
     # server set up
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -37,7 +37,7 @@ def pfserver():
     else:
         logfile = open('logs/credentials.log', 'w')
 
-    print ('[*] SMTP Server listening on {}:{}'.format(mailoney.bind_ip, mailoney.bind_port))
+    print(('[*] SMTP Server listening on {}:{}'.format(mailoney.bind_ip, mailoney.bind_port)))
 
     def handle_client(client_socket):
         # Send banner
@@ -95,7 +95,7 @@ def pfserver():
 
         client,addr = server.accept()
 
-        print "[*] Accepted connection from {}:{}".format(addr[0],addr[1])
+        print("[*] Accepted connection from {}:{}".format(addr[0],addr[1]))
 
         # now handle client data
         client_handler = threading.Thread(target=handle_client(client,))
