@@ -1,1 +1,1 @@
-hpfeeds
+hpfeeds==3.0.0

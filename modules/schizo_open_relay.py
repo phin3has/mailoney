@@ -21,10 +21,16 @@ import mailoney
 output_lock = threading.RLock()
 hpc,hpfeeds_prefix = mailoney.connect_hpfeeds()
 
+def string_escape(s, encoding='utf-8'):
+    return (s.encode('latin1')         # To bytes, required by 'unicode-escape'
+             .decode('unicode-escape') # Perform the actual octal-escaping decode
+             .encode('latin1')         # 1:1 mapping back to bytes
+             .decode(encoding))        # Decode original encoding
+
 def log_to_file(file_path, ip, port, data):
     with output_lock:
         with open(file_path, "a") as f:
-            message = "[{0}][{1}:{2}] {3}".format(time.time(), ip, port, data.encode("string-escape"))
+            message = "[{0}][{1}:{2}] {3}".format(time.time(), ip, port, string_escape(data))
             print(file_path + " " + message)
             f.write(message + "\n")
 
@@ -50,9 +56,8 @@ def process_packet_for_shellcode(packet, ip, port):
 
 
 __version__ = 'ESMTP Exim 4.69 #1 Thu, 29 Jul 2010 05:13:48 -0700'
-EMPTYSTRING = ''
-NEWLINE = '\n'
-
+EMPTYSTRING = b''
+NEWLINE = b'\n'
 
 class SMTPChannel(asynchat.async_chat):
     COMMAND = 0
@@ -60,7 +65,7 @@ class SMTPChannel(asynchat.async_chat):
 
     def __init__(self, server, conn, addr):
         asynchat.async_chat.__init__(self, conn)
-        self.__rolling_buffer = ""
+        self.__rolling_buffer = b""
         self.__server = server
         self.__conn = conn
         self.__addr = addr
@@ -74,7 +79,7 @@ class SMTPChannel(asynchat.async_chat):
         self.__fqdn = srvname
         try:
             self.__peer = conn.getpeername()
-        except socket.error, err:
+        except socket.error as err:
             # a race condition  may occur if the other end is closing
             # before we can get the peername
             self.close()
@@ -82,12 +87,18 @@ class SMTPChannel(asynchat.async_chat):
                 raise
             return
         #print(>> DEBUGSTREAM, 'Peer:', repr(self.__peer))
+        #self.set_terminator(b'\r\n')
+        self.set_terminator(b'\n')
         self.push('220 %s %s' % (self.__fqdn, __version__))
-        self.set_terminator('\r\n')
 
     # Overrides base class for convenience
     def push(self, msg):
-        asynchat.async_chat.push(self, msg + '\r\n')
+        if type(msg) == str:
+            encoded_msg = msg.encode() 
+        elif type(msg) == bytes:
+            encoded_msg = msg
+
+        asynchat.async_chat.push(self, encoded_msg + self.terminator)
 
     # Implementation of base class abstract method
     def collect_incoming_data(self, data):
@@ -100,9 +111,10 @@ class SMTPChannel(asynchat.async_chat):
 
     # Implementation of base class abstract method
     def found_terminator(self):
-        line = EMPTYSTRING.join(self.__line)
-        log_to_file(mailoney.logpath+"/commands.log", self.__addr[0], self.__addr[1], line.encode('string-escape'))
-        log_to_hpfeeds("commands",  json.dumps({ "Timestamp":format(time.time()), "ServerName": self.__fqdn, "SrcIP": self.__addr[0], "SrcPort": self.__addr[1],"Commmand" : line.encode('string-escape')}))
+
+        line = EMPTYSTRING.join(self.__line).decode()
+        log_to_file(mailoney.logpath+"/commands.log", self.__addr[0], self.__addr[1], string_escape(line))
+        log_to_hpfeeds("commands",  json.dumps({ "Timestamp":format(time.time()), "ServerName": self.__fqdn, "SrcIP": self.__addr[0], "SrcPort": self.__addr[1],"Commmand" : string_escape(line)}))
 
         #print(>> DEBUGSTREAM, 'Data:', repr(line))
         self.__line = []
@@ -271,7 +283,6 @@ class SMTPServer(asyncore.dispatcher):
         pair = self.accept()
         if pair is not None:
             conn, addr = pair
-            #print(>> DEBUGSTREAM, 'Incoming connection from %s' % repr(addr))
             channel = SMTPChannel(self, conn, addr)
 
     def handle_close(self):
