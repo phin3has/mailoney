@@ -1,0 +1,11 @@
+version: "3"
+services:
+  mailoney:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "2525:25"
+    volumes:
+      - ./mailoney_logs:/var/log/mailoney

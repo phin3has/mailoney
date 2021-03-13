@@ -38,9 +38,9 @@ def or_module():
         import mailoney
 
         honeypot = OpenRelay((mailoney.bind_ip, mailoney.bind_port), None)
-        print '[*] Mail Relay listening on {}:{}'.format(mailoney.bind_ip, mailoney.bind_port)
+        print('[*] Mail Relay listening on {}:{}'.format(mailoney.bind_ip, mailoney.bind_port))
         try:
             asyncore.loop()
         except KeyboardInterrupt:
-            print 'Detected interruption, terminating...'
+            print('Detected interruption, terminating...')
     run()
