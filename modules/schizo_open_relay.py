@@ -294,7 +294,7 @@ class SMTPServer(asyncore.dispatcher):
         self.close()
 
     # API for "doing something useful with the message"
-    def process_message(self, peer, mailfrom, rcpttos, data):
+    def process_message(self, peer, mailfrom, rcpttos, data, mail_options=None,rcpt_options=None):
         """Override this abstract method to handle messages from the client.
 
         peer is a tuple containing (ipaddr, port) of the client that made the
@@ -324,7 +324,7 @@ def module():
 
     class SchizoOpenRelay(SMTPServer):
 
-        def process_message(self, peer, mailfrom, rcpttos, data):
+        def process_message(self, peer, mailfrom, rcpttos, data, mail_options=None,rcpt_options=None):
             #setup the Log File
             log_to_file(mailoney.logpath+"/mail.log", peer[0], peer[1], '')
             log_to_file(mailoney.logpath+"/mail.log", peer[0], peer[1], '*' * 50)
