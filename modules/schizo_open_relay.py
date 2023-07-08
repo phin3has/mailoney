@@ -1,5 +1,6 @@
 __author__ = '@botnet_hunter'
 
+from datetime import datetime
 import socket
 try:
     import libemu
@@ -53,9 +54,13 @@ def process_packet_for_shellcode(packet, ip, port):
         log_to_file(mailoney.logpath+"/shellcode.log", ip, port, packet)
         log_to_hpfeeds("shellcode",  json.dumps({ "Timestamp":format(time.time()), "ServerName": self.__fqdn, "SrcIP": self.__addr[0], "SrcPort": self.__addr[1],"Shellcode" :packet}))
 
+def generate_version_date():
+    now = datetime.now()
+    week_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return "{0}, {1} {2} {3} {4}:{5}:{6}".format(week_days[now.weekday()], now.day, months[now.month - 1], now.year, str(now.hour).zfill(2), str(now.minute).zfill(2), str(now.second).zfill(2))
 
-
-__version__ = 'ESMTP Exim 4.69 #1 Thu, 29 Jul 2010 05:13:48 -0700'
+__version__ = 'ESMTP Exim 4.69 #1 {0} -0700'.format(generate_version_date())
 EMPTYSTRING = b''
 NEWLINE = b'\n'
 
