@@ -99,7 +99,7 @@ class SMTPChannel(asynchat.async_chat):
     # Overrides base class for convenience
     def push(self, msg):
         if type(msg) == str:
-            encoded_msg = msg.encode() 
+            encoded_msg = msg.encode()
         elif type(msg) == bytes:
             encoded_msg = msg
 
@@ -129,8 +129,9 @@ class SMTPChannel(asynchat.async_chat):
                 return
             method = None
             i = line.find(' ')
+
             if i < 0:
-                command = line.upper()
+                command = line[:-1].upper()
                 arg = None
             else:
                 command = line[:i].upper()
@@ -194,7 +195,6 @@ class SMTPChannel(asynchat.async_chat):
             self.push('250 Ok')
 
     def smtp_QUIT(self, arg):
-        # args is ignored
         self.push('221 Bye')
         self.close_when_done()
 

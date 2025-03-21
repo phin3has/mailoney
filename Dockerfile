@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:16.04
 
 RUN apt update && apt install -y python3 python3-pip
 
@@ -8,7 +8,6 @@ COPY . /opt/mailoney
 WORKDIR /opt/mailoney
 
 RUN /usr/bin/pip3 install -r requirements.txt
-
 RUN mkdir -p /var/log/mailoney
 RUN touch /var/log/mailoney/commands.log
 
