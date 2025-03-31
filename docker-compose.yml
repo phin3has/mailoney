@@ -1,11 +1,32 @@
-version: "3"
 services:
   mailoney:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: always
+    build: .
+    restart: unless-stopped
     ports:
-      - "2525:25"
+      - "25:25"
+    environment:
+      - MAILONEY_BIND_IP=0.0.0.0
+      - MAILONEY_BIND_PORT=25
+      - MAILONEY_SERVER_NAME=mail.example.com
+      - MAILONEY_LOG_LEVEL=INFO
+      - MAILONEY_DB_URL=postgresql://postgres:postgres@db:5432/mailoney
+    depends_on:
+      - db
+    
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mailoney
     volumes:
-      - ./mailoney_logs:/var/log/mailoney
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
