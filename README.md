@@ -1,60 +1,159 @@
-# About
-Mailoney is a SMTP Honeypot I wrote just to have fun learning Python. There are various modules or types (see below) that provide custom modes to fit your needs. Happily accepting advise, feature or pull requests. 
+# Mailoney
 
-# Installation
-At this time, everything should be included in a Linux python environment. Simply follow the usage instructions. 
+A Simple SMTP Honeypot with database logging.
 
-**NOTE:** To get all of the features out of the schizo module, users may wish to install the python-libemu module, but Mailoney will run with out it. 
+## About
 
-# Usage
+Mailoney is a low-interaction SMTP honeypot designed to detect and capture credentials from login attempts and potential SMTP abuse. This version uses database logging (PostgreSQL by default) to store all interactions and captured credentials.
+
+## Features
+
+- Simulates a basic SMTP server
+- Captures and logs authentication credentials
+- Stores all session data in a database
+- Dockerized for easy deployment
+- Modern Python package structure
+
+## Installation
+
+### Using Docker (Recommended)
+
+The easiest way to run Mailoney is using Docker Compose:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mailoney.git
+cd mailoney
+
+# Start the services
+docker-compose up -d
+```
+
+### Manual Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mailoney.git
+cd mailoney
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install the package in development mode
+pip install -e .
+
+# Run Mailoney
+python main.py
+```
+
+## Configuration
+
+Mailoney can be configured using command-line arguments or environment variables:
+
+### Command-line Arguments
+
+- `-i`, `--ip`: IP address to bind to (default: 0.0.0.0)
+- `-p`, `--port`: Port to listen on (default: 25)
+- `-s`, `--server-name`: Server name to display in SMTP responses
+- `-d`, `--db-url`: Database URL (default: sqlite:///mailoney.db)
+- `--log-level`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+### Environment Variables
+
+- `MAILONEY_BIND_IP`: IP address to bind to
+- `MAILONEY_BIND_PORT`: Port to listen on
+- `MAILONEY_SERVER_NAME`: Server name to display in SMTP responses
+- `MAILONEY_DB_URL`: Database URL
+- `MAILONEY_LOG_LEVEL`: Logging level
+
+## Database Configuration
+
+By default, Mailoney uses SQLite for simplicity, but PostgreSQL is recommended for production use:
+
+### PostgreSQL Connection String
 
 ```
-usage: mailoney.py [-h] [-i <ip address>] [-p <port>] -s mailserver -t
-                   {open_relay,postfix_creds,schizo_open_relay}
-
-Command line arguments
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i <ip address>       The IP address to listen on
-  -p <port>             The port to listen on
-  -s mailserver         A Name that'll show up as the mail server name
-  -t {open_relay,	Type of Honeypot 
-  	postfix_creds,
-  	schizo_open_relay}
+postgresql://username:password@hostname:port/database
 ```
-### Types
-Right now there are three types of Modules for Mailoney. 
-- open_relay - Just a generic open relay, will attempt to log full text emails attempted to be sent. 
-- postfix_creds - This module simply logs credentials from logon attempts. 
-- schizo_open_relay - This module logs everything, developed by [@botnet_hunter](https://twitter.com/botnet_hunter)
 
-# Running 
-SMTP ports 25, 465, 587 are privileged ports and therefore require elevated permissions (i.e. Sudo). It is probaby not a good idea to run your honeypot with elevated permissions. As such, I **strongly** encourage you to use port forwarding. 
+For example:
 
-Setting this up is easy, lets say we want to run Mailoney on port 2525 (a nice non-priveleged port). 
-#### IPTables example
-We can redirect port 25 to port 2525 with IPtables:
-`$ sudo iptables -t nat -A PREROUTING -p tcp --dport 25 -j REDIRECT --to-port 2525`
-
-#### UFW example
-If you are using UFW, you can edit *before.rules* (`/etc/ufw/before.rules`) by adding the following to the beginning:
 ```
-*nat
--F
-:PREROUTING ACCEPT [0:0]
--A PREROUTING -p tcp --dport 25 -j REDIRECT --to-port 2525
-COMMIT
+postgresql://postgres:postgres@localhost:5432/mailoney
 ```
-Then run `ufw reload` and you are all set. 
 
-# ToDo 
- - [ ] Add modules for EXIM, Microsoft, others
- - [ ] Build in Error Handling
- - [X] ~~Add a Daemon flag to background process.~~
- - [X] ~~Secure this by not requiring elevated perms, port forward from port 25.~~
- - [ ] Database logging
- - [ ] Possible relay for test emails. 
- - [ ] Make honeypot detection more difficult
- 	(e.g. fuzz mailoney with SMTP commands, catch exceptions, patch and profit)
+## Database Schema
 
+Mailoney creates two main tables:
+
+1. `smtp_sessions`: Stores information about each SMTP session
+   - `id`: Primary key
+   - `timestamp`: When the session started
+   - `ip_address`: Client IP address
+   - `port`: Client port
+   - `server_name`: Server name used
+   - `session_data`: JSON data containing the full session log
+
+2. `credentials`: Stores captured authentication credentials
+   - `id`: Primary key
+   - `timestamp`: When the credential was captured
+   - `session_id`: Foreign key to the session
+   - `auth_string`: The captured authentication string
+
+## Development
+
+### Running Tests
+
+```bash
+# Install development dependencies
+pip install pytest pytest-cov
+
+# Run tests
+pytest
+```
+
+### Database Migrations
+
+```bash
+# Create a new migration
+alembic revision --autogenerate -m "Description of changes"
+
+# Apply migrations
+alembic upgrade head
+```
+
+## Docker Hub
+
+The Docker image is automatically built and pushed to Docker Hub when changes are pushed to the main branch. You can pull the latest image with:
+
+```bash
+docker pull yourusername/mailoney:latest
+```
+
+## Project Structure
+
+```
+mailoney/
+├── mailoney/            # Main package
+│   ├── __init__.py      # Package initialization  
+│   ├── core.py          # Core server functionality
+│   ├── db.py            # Database handling
+│   ├── config.py        # Configuration management
+│   └── migrations/      # Database migrations
+├── tests/               # Test suite
+├── main.py              # Clean entry point
+├── docker-compose.yml   # Docker Compose configuration
+├── Dockerfile           # Docker configuration
+├── pyproject.toml       # Package configuration
+├── requirements.txt     # Dependencies
+└── README.md            # Documentation
+```
+
+## License
+
+MIT License
+
+## Acknowledgments
+
+This project is a modernized rewrite of the original Mailoney by @awhitehatter.

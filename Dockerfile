@@ -1,17 +1,28 @@
-FROM ubuntu:16.04
+FROM python:3.11-slim
 
-RUN apt update && apt install -y python3 python3-pip
+WORKDIR /app
 
-RUN mkdir -p /opt/mailoney
-COPY . /opt/mailoney
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    MAILONEY_DB_URL=sqlite:///mailoney.db
 
-WORKDIR /opt/mailoney
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN /usr/bin/pip3 install -r requirements.txt
-RUN mkdir -p /var/log/mailoney
-RUN touch /var/log/mailoney/commands.log
+# Copy application code
+COPY . .
 
+# Run as non-root user for better security
+RUN groupadd -r mailoney && \
+    useradd -r -g mailoney mailoney && \
+    chown -R mailoney:mailoney /app
 
-VOLUME /var/log/mailoney
+USER mailoney
 
-ENTRYPOINT ["/usr/bin/python3","mailoney.py","-i","0.0.0.0","-p","25","-t", "schizo_open_relay", "-logpath", "/var/log/mailoney", "-s","mailrelay.local"]
+# Expose port
+EXPOSE 25
+
+# Run the application
+ENTRYPOINT ["python", "main.py"]
