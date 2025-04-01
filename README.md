@@ -1,8 +1,8 @@
 # Mailoney
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/yourusername/mailoney)
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/yourusername/mailoney/Docker%20Image%20CI/CD)
-![GitHub](https://img.shields.io/github/license/yourusername/mailoney)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/phin3has/mailoney)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/phin3has/mailoney/Docker%20Image%20CI/CD)
+![GitHub](https://img.shields.io/github/license/phin3has/mailoney)
 
 A modern SMTP honeypot designed to capture and log email-based attacks with database integration.
 
@@ -24,7 +24,7 @@ Mailoney is a low-interaction SMTP honeypot that simulates a vulnerable mail ser
 Pull and run the container with a single command:
 
 ```bash
-docker run -p 25:25 ghcr.io/yourusername/mailoney:latest
+docker run -p 25:25 ghcr.io/phin3has/mailoney:latest
 ```
 
 ## Installation Options
@@ -40,7 +40,7 @@ version: '3.8'
 
 services:
   mailoney:
-    image: ghcr.io/yourusername/mailoney:latest
+    image: ghcr.io/phin3has/mailoney:latest
     restart: unless-stopped
     ports:
       - "25:25"
@@ -90,7 +90,7 @@ For development or customization:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mailoney.git
+git clone https://github.com/phin3has/mailoney.git
 cd mailoney
 
 # Create a virtual environment
