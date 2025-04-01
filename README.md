@@ -1,35 +1,92 @@
 # Mailoney
 
-A Simple SMTP Honeypot with database logging.
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/yourusername/mailoney)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/yourusername/mailoney/Docker%20Image%20CI/CD)
+![GitHub](https://img.shields.io/github/license/yourusername/mailoney)
+
+A modern SMTP honeypot designed to capture and log email-based attacks with database integration.
 
 ## About
 
-Mailoney is a low-interaction SMTP honeypot designed to detect and capture credentials from login attempts and potential SMTP abuse. This version uses database logging (PostgreSQL by default) to store all interactions and captured credentials.
+Mailoney is a low-interaction SMTP honeypot that simulates a vulnerable mail server to detect and log unauthorized access attempts, credential harvesting, and other SMTP-based attacks. This version (2.0.0) is a complete rewrite with modern Python packaging practices and database logging.
 
-## Features
+### Features
 
-- Simulates a basic SMTP server
-- Captures and logs authentication credentials
-- Stores all session data in a database
-- Dockerized for easy deployment
-- Modern Python package structure
+- 📧 Simulates an SMTP server accepting connections on port 25
+- 🔐 Captures authentication attempts and credentials
+- 💾 Stores all session data in a database (PostgreSQL recommended)
+- 🐳 Containerized for easy deployment via Docker
+- 🛠️ Modern, maintainable Python code base
+- 📊 Structured data for easy analysis and integration
 
-## Installation
+## Quick Start with Docker
 
-### Using Docker (Recommended)
-
-The easiest way to run Mailoney is using Docker Compose:
+Pull and run the container with a single command:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/mailoney.git
-cd mailoney
+docker run -p 25:25 ghcr.io/yourusername/mailoney:latest
+```
 
-# Start the services
+## Installation Options
+
+### Option 1: Docker Compose (Recommended)
+
+The most convenient way to run Mailoney with proper database persistence:
+
+1. Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+
+services:
+  mailoney:
+    image: ghcr.io/yourusername/mailoney:latest
+    restart: unless-stopped
+    ports:
+      - "25:25"
+    environment:
+      - MAILONEY_BIND_IP=0.0.0.0
+      - MAILONEY_BIND_PORT=25
+      - MAILONEY_SERVER_NAME=mail.example.com
+      - MAILONEY_LOG_LEVEL=INFO
+      - MAILONEY_DB_URL=postgresql://postgres:postgres@db:5432/mailoney
+    depends_on:
+      - db
+    
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mailoney
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+```
+
+2. Start the services:
+
+```bash
 docker-compose up -d
 ```
 
-### Manual Installation
+3. View logs:
+
+```bash
+docker-compose logs -f mailoney
+```
+
+### Option 2: Local Installation
+
+For development or customization:
 
 ```bash
 # Clone the repository
@@ -49,38 +106,48 @@ python main.py
 
 ## Configuration
 
-Mailoney can be configured using command-line arguments or environment variables:
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MAILONEY_BIND_IP` | IP address to bind to | 0.0.0.0 |
+| `MAILONEY_BIND_PORT` | Port to listen on | 25 |
+| `MAILONEY_SERVER_NAME` | SMTP server name | mail.example.com |
+| `MAILONEY_DB_URL` | Database connection URL | sqlite:///mailoney.db |
+| `MAILONEY_LOG_LEVEL` | Logging level | INFO |
 
 ### Command-line Arguments
 
-- `-i`, `--ip`: IP address to bind to (default: 0.0.0.0)
-- `-p`, `--port`: Port to listen on (default: 25)
+When running directly:
+
+```bash
+python main.py --help
+```
+
+Available arguments:
+- `-i`, `--ip`: IP address to bind to
+- `-p`, `--port`: Port to listen on
 - `-s`, `--server-name`: Server name to display in SMTP responses
-- `-d`, `--db-url`: Database URL (default: sqlite:///mailoney.db)
+- `-d`, `--db-url`: Database URL
 - `--log-level`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 
-### Environment Variables
+### Database Configuration
 
-- `MAILONEY_BIND_IP`: IP address to bind to
-- `MAILONEY_BIND_PORT`: Port to listen on
-- `MAILONEY_SERVER_NAME`: Server name to display in SMTP responses
-- `MAILONEY_DB_URL`: Database URL
-- `MAILONEY_LOG_LEVEL`: Logging level
+Mailoney can use various SQL databases:
 
-## Database Configuration
+**SQLite** (simplest, for testing):
+```
+sqlite:///mailoney.db
+```
 
-By default, Mailoney uses SQLite for simplicity, but PostgreSQL is recommended for production use:
-
-### PostgreSQL Connection String
-
+**PostgreSQL** (recommended for production):
 ```
 postgresql://username:password@hostname:port/database
 ```
 
-For example:
-
+**MySQL/MariaDB**:
 ```
-postgresql://postgres:postgres@localhost:5432/mailoney
+mysql+pymysql://username:password@hostname:port/database
 ```
 
 ## Database Schema
@@ -88,29 +155,25 @@ postgresql://postgres:postgres@localhost:5432/mailoney
 Mailoney creates two main tables:
 
 1. `smtp_sessions`: Stores information about each SMTP session
-   - `id`: Primary key
-   - `timestamp`: When the session started
-   - `ip_address`: Client IP address
-   - `port`: Client port
-   - `server_name`: Server name used
-   - `session_data`: JSON data containing the full session log
+   - Session ID, timestamp, IP address, port, server name
+   - Full JSON log of the entire session
 
 2. `credentials`: Stores captured authentication credentials
-   - `id`: Primary key
-   - `timestamp`: When the credential was captured
-   - `session_id`: Foreign key to the session
-   - `auth_string`: The captured authentication string
+   - Credential ID, timestamp, session ID, auth string
 
 ## Development
 
 ### Running Tests
 
 ```bash
-# Install development dependencies
+# Install test dependencies
 pip install pytest pytest-cov
 
 # Run tests
 pytest
+
+# Run tests with coverage
+pytest --cov=mailoney
 ```
 
 ### Database Migrations
@@ -123,12 +186,14 @@ alembic revision --autogenerate -m "Description of changes"
 alembic upgrade head
 ```
 
-## Docker Hub
-
-The Docker image is automatically built and pushed to Docker Hub when changes are pushed to the main branch. You can pull the latest image with:
+### Building the Package
 
 ```bash
-docker pull yourusername/mailoney:latest
+# Install build tools
+pip install build
+
+# Build the package
+python -m build
 ```
 
 ## Project Structure
@@ -146,13 +211,29 @@ mailoney/
 ├── docker-compose.yml   # Docker Compose configuration
 ├── Dockerfile           # Docker configuration
 ├── pyproject.toml       # Package configuration
-├── requirements.txt     # Dependencies
-└── README.md            # Documentation
+└── ... other files
 ```
+
+## Security Considerations
+
+- Mailoney is a honeypot and should be deployed in a controlled environment
+- Consider running with limited privileges
+- Firewall appropriately to prevent misuse
+- Regularly backup and analyze collected data
+
+## Integrating with Other Tools
+
+### Forwarding Logs to Security Systems
+
+Mailoney stores all interaction data in the database. To integrate with SIEM or other security tools:
+
+1. **Direct Database Integration**: Connect your security tools to the PostgreSQL database
+2. **Log Forwarding**: Use a separate service to monitor the database and forward events
+3. **API Development**: Extend Mailoney to provide a REST API for data access
 
 ## License
 
-MIT License
+MIT License - See LICENSE file for details.
 
 ## Acknowledgments
 
