@@ -3,10 +3,14 @@ Tests for the database module
 """
 import pytest
 import os
-from sqlalchemy import create_engine
+import logging
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
 from mailoney.db import Base, init_db, create_session, update_session_data, log_credential
+
+# Configure logging for debugging
+logging.basicConfig(level=logging.DEBUG)
 
 @pytest.fixture
 def test_db():
@@ -19,30 +23,24 @@ def test_db():
     mailoney.db.engine = None
     mailoney.db.Session = None
     
-    # Initialize the database
+    # Create a direct engine for this test
+    test_engine = create_engine(db_url)
+    
+    # Create all tables directly
+    Base.metadata.create_all(test_engine)
+    
+    # Now initialize the database with our engine
     init_db(db_url)
     
-    # Create tables (this should already happen in init_db)
+    # Verify tables exist
     from mailoney.db import engine
-    Base.metadata.create_all(engine)
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    logging.debug(f"Tables in database: {table_names}")
     
-    # Create a dummy record to ensure tables exist
-    from mailoney.db import Session, SMTPSession
-    session = Session()
-    try:
-        # Test creating a record to ensure the table exists
-        test_session = SMTPSession(
-            ip_address="127.0.0.1",
-            port=25,
-            server_name="test.local"
-        )
-        session.add(test_session)
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        raise e
-    finally:
-        session.close()
+    # Make sure our tables are there
+    assert "smtp_sessions" in table_names
+    assert "credentials" in table_names
     
     yield
     

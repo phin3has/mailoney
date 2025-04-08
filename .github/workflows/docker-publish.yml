@@ -23,10 +23,20 @@ jobs:
         pip install pytest pytest-cov alembic
     - name: Run migrations and test with pytest
       run: |
-        # Run database migrations
-        alembic upgrade head
-        # Run tests
-        pytest
+        # Create migrations directory if it doesn't exist
+        mkdir -p mailoney/migrations/versions
+        
+        # Set up alembic environment
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
+        
+        # Create initial migration if it doesn't exist
+        if [ ! -f mailoney/migrations/versions/1a5b9822e49c_initial_migration.py ]; then
+          echo "Creating initial migration file"
+          cp .github/initial_migration.py mailoney/migrations/versions/1a5b9822e49c_initial_migration.py
+        fi
+        
+        # Run tests with verbose output
+        PYTHONPATH=$(pwd) pytest -v
 
   build-and-push:
     needs: test

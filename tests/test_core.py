@@ -43,5 +43,5 @@ def test_smtp_honeypot_start(mock_socket, smtp_honeypot):
     mock_socket_instance.bind.assert_called_with(("127.0.0.1", 8025))
     mock_socket_instance.listen.assert_called_with(10)
     
-    # Verify _accept_connections was called
-    assert smtp_honeypot._accept_connections.called
+    # Verify _accept_connections was called - for older mock versions
+    assert smtp_honeypot._accept_connections.call_count > 0
