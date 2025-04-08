@@ -14,12 +14,35 @@ def test_db():
     # Use in-memory SQLite for testing
     db_url = "sqlite:///:memory:"
     
+    # Force re-initialization of the database
+    import mailoney.db
+    mailoney.db.engine = None
+    mailoney.db.Session = None
+    
     # Initialize the database
     init_db(db_url)
     
-    # Create tables
+    # Create tables (this should already happen in init_db)
     from mailoney.db import engine
     Base.metadata.create_all(engine)
+    
+    # Create a dummy record to ensure tables exist
+    from mailoney.db import Session, SMTPSession
+    session = Session()
+    try:
+        # Test creating a record to ensure the table exists
+        test_session = SMTPSession(
+            ip_address="127.0.0.1",
+            port=25,
+            server_name="test.local"
+        )
+        session.add(test_session)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
     
     yield
     

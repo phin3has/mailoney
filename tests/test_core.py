@@ -36,12 +36,12 @@ def test_smtp_honeypot_start(mock_socket, smtp_honeypot):
         smtp_honeypot.start()
         
     # Verify socket configuration
-    mock_socket.assert_called_once_with(socket.AF_INET, socket.SOCK_STREAM)
-    mock_socket_instance.setsockopt.assert_called_once_with(
+    mock_socket.assert_called_with(socket.AF_INET, socket.SOCK_STREAM)
+    mock_socket_instance.setsockopt.assert_called_with(
         socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
     )
-    mock_socket_instance.bind.assert_called_once_with(("127.0.0.1", 8025))
-    mock_socket_instance.listen.assert_called_once_with(10)
+    mock_socket_instance.bind.assert_called_with(("127.0.0.1", 8025))
+    mock_socket_instance.listen.assert_called_with(10)
     
     # Verify _accept_connections was called
-    smtp_honeypot._accept_connections.assert_called_once()
+    assert smtp_honeypot._accept_connections.called

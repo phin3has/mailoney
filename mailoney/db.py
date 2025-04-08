@@ -63,6 +63,25 @@ def init_db(db_url: Optional[str] = None) -> None:
     
     # Create tables if they don't exist
     Base.metadata.create_all(engine)
+    
+    # Run database migrations
+    try:
+        import os
+        from alembic import command
+        from alembic.config import Config
+        
+        # Find the alembic.ini file
+        alembic_ini = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'alembic.ini')
+        if os.path.exists(alembic_ini):
+            alembic_cfg = Config(alembic_ini)
+            alembic_cfg.set_main_option('sqlalchemy.url', db_url)
+            command.upgrade(alembic_cfg, 'head')
+            logger.info("Database migrations applied successfully")
+    except ImportError:
+        logger.warning("Alembic not installed, skipping database migrations")
+    except Exception as e:
+        logger.warning(f"Error applying migrations: {e}")
+    
     logger.info(f"Database initialized with URL: {db_url}")
 
 def create_session(ip_address: str, port: int, server_name: str) -> SMTPSession:
