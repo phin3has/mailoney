@@ -3,10 +3,11 @@ Database handling module for Mailoney
 """
 import os
 import logging
+import sqlalchemy as sa
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, ForeignKey, inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.pool import NullPool
@@ -60,20 +61,33 @@ def init_db(db_url: Optional[str] = None) -> None:
     
     logger.info(f"Initializing database with URL: {db_url}")
     
-    # For in-memory SQLite, we need to use a different approach
+    # For in-memory SQLite, we need to use specific settings
     is_memory_db = db_url == "sqlite:///:memory:"
     connect_args = {}
     if is_memory_db:
+        # Use a shared connection for in-memory SQLite
         connect_args = {"check_same_thread": False}
-        logger.info("Using in-memory SQLite database")
+        logger.info("Using in-memory SQLite database with shared connection")
     
-    engine = create_engine(db_url, poolclass=NullPool, connect_args=connect_args)
-    Session = sessionmaker(bind=engine)
+    # Create the engine with appropriate settings
+    engine = create_engine(db_url, poolclass=NullPool, connect_args=connect_args, future=True)
+    Session = sessionmaker(bind=engine, future=True)
     
-    # Create tables if they don't exist
+    # Always ensure tables exist
     Base.metadata.create_all(engine)
+    logger.info("Tables created successfully")
     
-    # Run database migrations if not using in-memory database
+    # Verify tables were created (for debugging)
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        logger.info(f"Tables in database: {tables}")
+        if 'smtp_sessions' not in tables or 'credentials' not in tables:
+            logger.warning("Expected tables not found after create_all!")
+    except Exception as e:
+        logger.error(f"Error inspecting tables: {e}")
+    
+    # Run migrations if not using in-memory DB
     if not is_memory_db:
         try:
             import os
@@ -91,8 +105,6 @@ def init_db(db_url: Optional[str] = None) -> None:
             logger.warning("Alembic not installed, skipping database migrations")
         except Exception as e:
             logger.warning(f"Error applying migrations: {e}")
-    
-    logger.info(f"Database initialized with URL: {db_url}")
 
 def create_session(ip_address: str, port: int, server_name: str) -> SMTPSession:
     """
@@ -139,7 +151,9 @@ def update_session_data(session_id: int, session_data: str) -> None:
     
     session = Session()
     try:
-        smtp_session = session.query(SMTPSession).filter_by(id=session_id).first()
+        # SQLAlchemy 2.0 style
+        stmt = sa.select(SMTPSession).filter_by(id=session_id)
+        smtp_session = session.execute(stmt).scalar_one_or_none()
         if smtp_session:
             smtp_session.session_data = session_data
             session.commit()

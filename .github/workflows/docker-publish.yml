@@ -35,8 +35,8 @@ jobs:
           cp .github/initial_migration.py mailoney/migrations/versions/1a5b9822e49c_initial_migration.py
         fi
         
-        # Run tests with verbose output
-        PYTHONPATH=$(pwd) pytest -v
+        # Run tests with verbose output and debugging
+        PYTHONPATH=$(pwd) pytest -vv --log-cli-level=DEBUG
 
   build-and-push:
     needs: test

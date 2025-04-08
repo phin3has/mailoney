@@ -31,8 +31,17 @@ def test_smtp_honeypot_start(mock_socket, smtp_honeypot):
     mock_socket_instance = MagicMock()
     mock_socket.return_value = mock_socket_instance
     
-    # Patch _accept_connections to avoid infinite loop
-    with patch.object(smtp_honeypot, "_accept_connections", return_value=None):
+    # Create a flag to check if _accept_connections was called
+    was_called = [False]
+    original_accept = smtp_honeypot._accept_connections
+    
+    # Create a wrapper function that sets the flag
+    def accept_wrapper(*args, **kwargs):
+        was_called[0] = True
+        return None
+    
+    # Patch _accept_connections to avoid infinite loop and check if called
+    with patch.object(smtp_honeypot, "_accept_connections", side_effect=accept_wrapper):
         smtp_honeypot.start()
         
     # Verify socket configuration
@@ -43,5 +52,5 @@ def test_smtp_honeypot_start(mock_socket, smtp_honeypot):
     mock_socket_instance.bind.assert_called_with(("127.0.0.1", 8025))
     mock_socket_instance.listen.assert_called_with(10)
     
-    # Verify _accept_connections was called - for older mock versions
-    assert smtp_honeypot._accept_connections.call_count > 0
+    # Verify _accept_connections was called using our own flag
+    assert was_called[0] == True, "_accept_connections method was not called"

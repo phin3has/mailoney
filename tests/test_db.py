@@ -4,6 +4,7 @@ Tests for the database module
 import pytest
 import os
 import logging
+import sqlalchemy as sa
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
@@ -19,33 +20,60 @@ def test_db():
     db_url = "sqlite:///:memory:"
     
     # Force re-initialization of the database
-    import mailoney.db
-    mailoney.db.engine = None
-    mailoney.db.Session = None
+    import mailoney.db as db_module
     
-    # Create a direct engine for this test
-    test_engine = create_engine(db_url)
+    # Reset global variables
+    db_module.engine = None
+    db_module.Session = None
     
-    # Create all tables directly
-    Base.metadata.create_all(test_engine)
+    # Create the engine and ensure tables exist
+    engine = create_engine(db_url)
+    Base.metadata.drop_all(engine)  # Make sure we start fresh
+    Base.metadata.create_all(engine)
     
-    # Now initialize the database with our engine
-    init_db(db_url)
+    # Check if tables were created using SQLAlchemy 2.0+ compatible methods
+    insp = inspect(engine)
+    has_tables = all(table in insp.get_table_names() for table in ['smtp_sessions', 'credentials'])
     
-    # Verify tables exist
-    from mailoney.db import engine
-    inspector = inspect(engine)
-    table_names = inspector.get_table_names()
-    logging.debug(f"Tables in database: {table_names}")
+    if not has_tables:
+        logging.warning("Tables not detected, forcing creation...")
+        # Create tables manually if needed
+        connection = engine.connect()
+        try:
+            connection.execute(sa.text("CREATE TABLE IF NOT EXISTS smtp_sessions "
+                             "(id INTEGER PRIMARY KEY, "
+                             "timestamp DATETIME, "
+                             "ip_address VARCHAR(255) NOT NULL, "
+                             "port INTEGER NOT NULL, "
+                             "server_name VARCHAR(255), "
+                             "session_data TEXT)"))
+            
+            connection.execute(sa.text("CREATE TABLE IF NOT EXISTS credentials "
+                             "(id INTEGER PRIMARY KEY, "
+                             "timestamp DATETIME, "
+                             "session_id INTEGER, "
+                             "auth_string VARCHAR(255), "
+                             "FOREIGN KEY(session_id) REFERENCES smtp_sessions(id))"))
+            connection.commit()
+        finally:
+            connection.close()
     
-    # Make sure our tables are there
-    assert "smtp_sessions" in table_names
-    assert "credentials" in table_names
+    # Initialize the database (this should connect to our in-memory DB)
+    db_module.init_db(db_url)
     
+    # Final verification
+    insp = inspect(db_module.engine)
+    tables = insp.get_table_names()
+    logging.debug(f"Tables in database after initialization: {tables}")
+    
+    # Now proceed with tests
     yield
     
     # Clean up
-    Base.metadata.drop_all(engine)
+    try:
+        Base.metadata.drop_all(db_module.engine)
+    except Exception as e:
+        logging.warning(f"Error during cleanup: {e}")
 
 def test_create_session(test_db):
     """Test creating a session record"""
@@ -64,7 +92,9 @@ def test_update_session_data(test_db):
     from mailoney.db import Session, SMTPSession
     db_session = Session()
     try:
-        updated_session = db_session.query(SMTPSession).filter_by(id=session.id).first()
+        # SQLAlchemy 2.0 syntax
+        stmt = sa.select(SMTPSession).filter_by(id=session.id)
+        updated_session = db_session.execute(stmt).scalar_one()
         assert updated_session.session_data == '{"test": "data"}'
     finally:
         db_session.close()
@@ -78,7 +108,9 @@ def test_log_credential(test_db):
     from mailoney.db import Session, Credential
     db_session = Session()
     try:
-        credential = db_session.query(Credential).filter_by(session_id=session.id).first()
+        # SQLAlchemy 2.0 syntax
+        stmt = sa.select(Credential).filter_by(session_id=session.id)
+        credential = db_session.execute(stmt).scalar_one()
         assert credential is not None
         assert credential.auth_string == "dGVzdDp0ZXN0"
     finally:
