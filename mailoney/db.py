@@ -131,22 +131,33 @@ def create_session(ip_address: str, port: int, server_name: str) -> SMTPSession:
         logger.warning("Tables missing, recreating...")
         Base.metadata.create_all(engine)
     
-    session = Session()
+    db_session = Session()
     try:
         smtp_session = SMTPSession(
             ip_address=ip_address,
             port=port,
             server_name=server_name
         )
-        session.add(smtp_session)
-        session.commit()
-        return smtp_session
+        db_session.add(smtp_session)
+        db_session.commit()
+        
+        # This is key: Make a copy of all the attributes we need before closing session
+        session_copy = SMTPSession(
+            id=smtp_session.id,
+            timestamp=smtp_session.timestamp,
+            ip_address=smtp_session.ip_address,
+            port=smtp_session.port,
+            server_name=smtp_session.server_name,
+            session_data=smtp_session.session_data
+        )
+        
+        return session_copy
     except Exception as e:
-        session.rollback()
+        db_session.rollback()
         logger.error(f"Error creating session: {e}")
         raise
     finally:
-        session.close()
+        db_session.close()
 
 def update_session_data(session_id: int, session_data: str) -> None:
     """

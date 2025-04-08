@@ -239,4 +239,4 @@ MIT License - See LICENSE file for details.
 
 This project is a modernized rewrite of the original Mailoney by @phin3has.
 
-test. 
+ 

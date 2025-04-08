@@ -1,0 +1,10 @@
+Fix SQLAlchemy DetachedInstanceError issues
+
+* Created detached-instance safe copies in create_session
+* Updated test methods to handle detached instances properly
+* Improved database verification in tests
+* Fixed session handling in all database-related tests
+* Added explicit verification that database operations work correctly
+
+This fixes the DetachedInstanceError by ensuring we don't use objects 
+after their original session is closed.
