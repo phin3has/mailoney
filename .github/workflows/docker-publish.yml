@@ -2,10 +2,10 @@ name: Docker Image CI/CD
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     tags: [ 'v*.*.*' ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   test:
@@ -31,7 +31,7 @@ jobs:
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     permissions:
       contents: read
       packages: write
