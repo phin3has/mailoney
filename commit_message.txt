@@ -1,10 +1,7 @@
-Fix SQLAlchemy DetachedInstanceError issues
+Add multi-architecture Docker build support
 
-* Created detached-instance safe copies in create_session
-* Updated test methods to handle detached instances properly
-* Improved database verification in tests
-* Fixed session handling in all database-related tests
-* Added explicit verification that database operations work correctly
-
-This fixes the DetachedInstanceError by ensuring we don't use objects 
-after their original session is closed.
+* Updated GitHub Actions workflow to build for both amd64 and arm64
+* Added platform specification to docker/setup-buildx-action
+* Added platform specification to docker/build-push-action
+* This allows the Docker image to run on both x86_64 and ARM architectures
+* Fixes "no matching manifest" error when pulling on ARM devices
