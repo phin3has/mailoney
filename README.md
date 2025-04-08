@@ -237,4 +237,4 @@ MIT License - See LICENSE file for details.
 
 ## Acknowledgments
 
-This project is a modernized rewrite of the original Mailoney by @awhitehatter.
+This project is a modernized rewrite of the original Mailoney by @phin3has.
