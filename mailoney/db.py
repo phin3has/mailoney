@@ -118,8 +118,18 @@ def create_session(ip_address: str, port: int, server_name: str) -> SMTPSession:
     Returns:
         The created SMTPSession instance
     """
+    global engine, Session
+    
     if Session is None:
         init_db()
+    
+    # First verify that tables exist
+    insp = inspect(engine)
+    tables = insp.get_table_names()
+    if 'smtp_sessions' not in tables:
+        # Recreate tables if they don't exist
+        logger.warning("Tables missing, recreating...")
+        Base.metadata.create_all(engine)
     
     session = Session()
     try:

@@ -15,65 +15,20 @@ logging.basicConfig(level=logging.DEBUG)
 
 @pytest.fixture
 def test_db():
-    """Test database fixture"""
-    # Use in-memory SQLite for testing
-    db_url = "sqlite:///:memory:"
+    """Simple test database fixture that ensures a clean state before each test"""
+    # The actual setup is done in conftest.py
+    # This fixture just ensures each test starts with a clean db state
     
-    # Force re-initialization of the database
-    import mailoney.db as db_module
+    from mailoney.db import engine
     
-    # Reset global variables
-    db_module.engine = None
-    db_module.Session = None
-    
-    # Create the engine and ensure tables exist
-    engine = create_engine(db_url)
-    Base.metadata.drop_all(engine)  # Make sure we start fresh
-    Base.metadata.create_all(engine)
-    
-    # Check if tables were created using SQLAlchemy 2.0+ compatible methods
+    # Verify tables are there (debugging)
     insp = inspect(engine)
-    has_tables = all(table in insp.get_table_names() for table in ['smtp_sessions', 'credentials'])
-    
-    if not has_tables:
-        logging.warning("Tables not detected, forcing creation...")
-        # Create tables manually if needed
-        connection = engine.connect()
-        try:
-            connection.execute(sa.text("CREATE TABLE IF NOT EXISTS smtp_sessions "
-                             "(id INTEGER PRIMARY KEY, "
-                             "timestamp DATETIME, "
-                             "ip_address VARCHAR(255) NOT NULL, "
-                             "port INTEGER NOT NULL, "
-                             "server_name VARCHAR(255), "
-                             "session_data TEXT)"))
-            
-            connection.execute(sa.text("CREATE TABLE IF NOT EXISTS credentials "
-                             "(id INTEGER PRIMARY KEY, "
-                             "timestamp DATETIME, "
-                             "session_id INTEGER, "
-                             "auth_string VARCHAR(255), "
-                             "FOREIGN KEY(session_id) REFERENCES smtp_sessions(id))"))
-            connection.commit()
-        finally:
-            connection.close()
-    
-    # Initialize the database (this should connect to our in-memory DB)
-    db_module.init_db(db_url)
-    
-    # Final verification
-    insp = inspect(db_module.engine)
     tables = insp.get_table_names()
-    logging.debug(f"Tables in database after initialization: {tables}")
+    logging.info(f"Available tables for test: {tables}")
     
-    # Now proceed with tests
     yield
     
-    # Clean up
-    try:
-        Base.metadata.drop_all(db_module.engine)
-    except Exception as e:
-        logging.warning(f"Error during cleanup: {e}")
+    # No cleanup needed - handled in conftest
 
 def test_create_session(test_db):
     """Test creating a session record"""

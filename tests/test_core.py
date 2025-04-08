@@ -31,26 +31,32 @@ def test_smtp_honeypot_start(mock_socket, smtp_honeypot):
     mock_socket_instance = MagicMock()
     mock_socket.return_value = mock_socket_instance
     
-    # Create a flag to check if _accept_connections was called
-    was_called = [False]
-    original_accept = smtp_honeypot._accept_connections
+    # Create a simple counter to check if the method was called
+    call_count = [0]
     
-    # Create a wrapper function that sets the flag
-    def accept_wrapper(*args, **kwargs):
-        was_called[0] = True
+    # Define a replacement function that increments the counter
+    def accept_connections_mock():
+        call_count[0] += 1
         return None
     
-    # Patch _accept_connections to avoid infinite loop and check if called
-    with patch.object(smtp_honeypot, "_accept_connections", side_effect=accept_wrapper):
+    # Replace the method with our mock that increments the counter
+    original_method = smtp_honeypot._accept_connections
+    smtp_honeypot._accept_connections = accept_connections_mock
+    
+    try:
+        # Call the start method
         smtp_honeypot.start()
         
-    # Verify socket configuration
-    mock_socket.assert_called_with(socket.AF_INET, socket.SOCK_STREAM)
-    mock_socket_instance.setsockopt.assert_called_with(
-        socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
-    )
-    mock_socket_instance.bind.assert_called_with(("127.0.0.1", 8025))
-    mock_socket_instance.listen.assert_called_with(10)
-    
-    # Verify _accept_connections was called using our own flag
-    assert was_called[0] == True, "_accept_connections method was not called"
+        # Verify socket configuration
+        mock_socket.assert_called_with(socket.AF_INET, socket.SOCK_STREAM)
+        mock_socket_instance.setsockopt.assert_called_with(
+            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
+        )
+        mock_socket_instance.bind.assert_called_with(("127.0.0.1", 8025))
+        mock_socket_instance.listen.assert_called_with(10)
+        
+        # Verify our function was called
+        assert call_count[0] > 0, "The _accept_connections method was not called"
+    finally:
+        # Restore the original method
+        smtp_honeypot._accept_connections = original_method
