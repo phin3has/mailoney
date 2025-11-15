@@ -48,3 +48,7 @@ logs/
 
 # Docker
 .docker/
+
+# Claude Code
+.claude/
+CLAUDE*.md
