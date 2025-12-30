@@ -37,7 +37,7 @@ def test_create_session(test_db):
     assert session.ip_address == "192.168.1.1"
     assert session.port == 12345
     assert session.server_name == "test.example.com"
-    
+
     # Verify the session was created in the database
     from mailoney.db import Session, SMTPSession
     db_session = Session()
@@ -48,6 +48,40 @@ def test_create_session(test_db):
         assert db_result.ip_address == "192.168.1.1"
     finally:
         db_session.close()
+
+
+def test_create_session_with_destination(test_db):
+    """Test creating a session record with destination IP and port"""
+    session = create_session(
+        "192.168.1.100", 54321, "mail.test.com",
+        dest_ip="10.0.0.1",
+        dest_port=25
+    )
+    assert session.id is not None
+    assert session.ip_address == "192.168.1.100"
+    assert session.port == 54321
+    assert session.server_name == "mail.test.com"
+    assert session.dest_ip == "10.0.0.1"
+    assert session.dest_port == 25
+
+    # Verify the session was created in the database with destination info
+    from mailoney.db import Session, SMTPSession
+    db_session = Session()
+    try:
+        stmt = sa.select(SMTPSession).filter_by(id=session.id)
+        db_result = db_session.execute(stmt).scalar_one_or_none()
+        assert db_result is not None
+        assert db_result.dest_ip == "10.0.0.1"
+        assert db_result.dest_port == 25
+    finally:
+        db_session.close()
+
+
+def test_create_session_without_destination(test_db):
+    """Test that sessions without destination info have None values"""
+    session = create_session("192.168.1.50", 9999, "legacy.test.com")
+    assert session.dest_ip is None
+    assert session.dest_port is None
 
 def test_update_session_data(test_db):
     """Test updating session data"""

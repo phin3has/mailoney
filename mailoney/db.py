@@ -27,6 +27,9 @@ class SMTPSession(Base):
     port = Column(Integer, nullable=False)
     server_name = Column(String(255))
     session_data = Column(Text)
+    # Destination (server) IP and port - the honeypot's listening address
+    dest_ip = Column(String(255), nullable=True)
+    dest_port = Column(Integer, nullable=True)
     
 class Credential(Base):
     """Model for captured credentials"""
@@ -106,15 +109,23 @@ def init_db(db_url: Optional[str] = None) -> None:
         except Exception as e:
             logger.warning(f"Error applying migrations: {e}")
 
-def create_session(ip_address: str, port: int, server_name: str) -> SMTPSession:
+def create_session(
+    ip_address: str,
+    port: int,
+    server_name: str,
+    dest_ip: Optional[str] = None,
+    dest_port: Optional[int] = None
+) -> SMTPSession:
     """
     Create a new session record in the database.
-    
+
     Args:
-        ip_address: Client IP address
-        port: Client port
+        ip_address: Client IP address (source)
+        port: Client port (source)
         server_name: Server name used
-        
+        dest_ip: Server's bound IP address (destination)
+        dest_port: Server's bound port (destination)
+
     Returns:
         The created SMTPSession instance
     """
@@ -136,11 +147,13 @@ def create_session(ip_address: str, port: int, server_name: str) -> SMTPSession:
         smtp_session = SMTPSession(
             ip_address=ip_address,
             port=port,
-            server_name=server_name
+            server_name=server_name,
+            dest_ip=dest_ip,
+            dest_port=dest_port
         )
         db_session.add(smtp_session)
         db_session.commit()
-        
+
         # This is key: Make a copy of all the attributes we need before closing session
         session_copy = SMTPSession(
             id=smtp_session.id,
@@ -148,7 +161,9 @@ def create_session(ip_address: str, port: int, server_name: str) -> SMTPSession:
             ip_address=smtp_session.ip_address,
             port=smtp_session.port,
             server_name=smtp_session.server_name,
-            session_data=smtp_session.session_data
+            session_data=smtp_session.session_data,
+            dest_ip=smtp_session.dest_ip,
+            dest_port=smtp_session.dest_port
         )
         
         return session_copy

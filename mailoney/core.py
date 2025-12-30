@@ -74,8 +74,8 @@ class SMTPHoneypot:
         while True:
             try:
                 client, addr = self.socket.accept()
-                logger.info(f"Connection from {addr[0]}:{addr[1]}")
-                print(f"[*] Connection from {addr[0]}:{addr[1]}")
+                logger.info(f"Connection from {addr[0]}:{addr[1]} to {self.bind_ip}:{self.bind_port}")
+                print(f"[*] Connection from {addr[0]}:{addr[1]} to {self.bind_ip}:{self.bind_port}")
                 
                 client_handler = threading.Thread(
                     target=self._handle_client,
@@ -94,7 +94,11 @@ class SMTPHoneypot:
             client_socket: Client socket
             addr: Client address tuple (ip, port)
         """
-        session_record = create_session(addr[0], addr[1], self.server_name)
+        session_record = create_session(
+            addr[0], addr[1], self.server_name,
+            dest_ip=self.bind_ip,
+            dest_port=self.bind_port
+        )
         session_log = []
         
         try:
@@ -165,7 +169,7 @@ class SMTPHoneypot:
             logger.error(f"Error in client handler: {e}")
         finally:
             client_socket.close()
-            logger.info(f"Connection closed for {addr[0]}:{addr[1]}")
+            logger.info(f"Connection closed for {addr[0]}:{addr[1]} (dest: {self.bind_ip}:{self.bind_port})")
             
     def stop(self) -> None:
         """
