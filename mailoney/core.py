@@ -5,6 +5,7 @@ import socket
 import threading
 import logging
 import json
+import re
 import sys
 import argparse
 from time import strftime
@@ -109,12 +110,25 @@ class SMTPHoneypot:
             
             # Handle client commands
             error_count = 0
+            receiving_mail = False
+
             while error_count < 10:
                 try:
-                    request = client_socket.recv(4096).decode().strip().lower()
+                    raw_request = client_socket.recv(4096).decode()
+                    request = raw_request.strip().lower()
                     if not request:
                         break
                         
+                    if receiving_mail:
+                        session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "in-body", "data": request})
+                        if re.search(r'(?:\r?\n|^)\.(?:\r?\n|$)', raw_request):
+                            response = "451 4.7.1 Try again later\n"
+                            client_socket.send(response.encode())
+                            session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": response})
+                            receiving_mail = False
+
+                        continue
+
                     session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "in", "data": request})
                     logger.debug(f"Client: {request}")
                     
@@ -145,12 +159,20 @@ class SMTPHoneypot:
                         break
                         
                     # Handle other SMTP commands (simplistic simulation)
-                    elif request.startswith(('mail from:', 'rcpt to:', 'data')):
+                    elif request.startswith(('mail from:', 'rcpt to:')):
                         response = "250 2.1.0 OK\n"
                         client_socket.send(response.encode())
                         session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": response})
                         error_count = 0
-                        
+
+                    # Receive an e-mail
+                    elif request.startswith('data'):
+                        response = "354 End data with <CR><LF>.<CR><LF>\n"
+                        client_socket.send(response.encode())
+                        session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": response})
+                        receiving_mail = True
+                        error_count = 0
+
                     # Unknown command
                     else:
                         response = "502 5.5.2 Error: command not recognized\n"
