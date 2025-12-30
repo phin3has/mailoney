@@ -8,7 +8,7 @@ A modern SMTP honeypot designed to capture and log email-based attacks with data
 
 ## About
 
-Mailoney is a low-interaction SMTP honeypot that simulates a vulnerable mail server to detect and log unauthorized access attempts, credential harvesting, and other SMTP-based attacks. This version (2.0.0) is a complete rewrite with modern Python packaging practices and database logging.
+Mailoney is a low-interaction SMTP honeypot that simulates a vulnerable mail server to detect and log unauthorized access attempts, credential harvesting, and other SMTP-based attacks. This version (2.1.0) is a complete rewrite with modern Python packaging practices and database logging.
 
 ### Features
 
