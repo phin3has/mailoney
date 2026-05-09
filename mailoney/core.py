@@ -49,13 +49,31 @@ class SMTPHoneypot:
         
     def start(self) -> None:
         """
-        Start the SMTP honeypot server
+        Start the SMTP honeypot server.
+
+        Supports IPv4 (e.g. ``0.0.0.0``), IPv6 (e.g. ``::1``), and
+        dual-stack (``::``) bind addresses. Uses ``socket.create_server``
+        so dual-stack mode works transparently when the platform allows.
         """
         try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.socket.bind((self.bind_ip, self.bind_port))
-            self.socket.listen(10)
+            if ":" in self.bind_ip:
+                family = socket.AF_INET6
+                # '::' is the IPv6 wildcard; pair it with dualstack_ipv6
+                # so the listener also accepts IPv4-mapped connections.
+                dualstack = (
+                    self.bind_ip in ("::", "::0")
+                    and socket.has_dualstack_ipv6()
+                )
+            else:
+                family = socket.AF_INET
+                dualstack = False
+
+            self.socket = socket.create_server(
+                (self.bind_ip, self.bind_port),
+                family=family,
+                backlog=10,
+                dualstack_ipv6=dualstack,
+            )
             
             logger.info(f"SMTP Honeypot listening on {self.bind_ip}:{self.bind_port}")
             print(f"[*] SMTP Honeypot listening on {self.bind_ip}:{self.bind_port}")
