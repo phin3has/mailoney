@@ -10,9 +10,7 @@ The session record in the DB and the event log carry the *relative* path
 keeping operational data small and letting bodies be handled like any
 other file by mail/forensics tooling.
 
-IPv6 source IPs land in folder names with their colons intact. This is
-fine on Linux filesystems but will break Windows / FAT / exFAT bind
-mounts; deploy on Linux.
+IPv6 source IPs land in folder names with their colons intact.
 """
 import logging
 import os

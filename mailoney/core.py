@@ -50,8 +50,10 @@ class SMTPHoneypot:
             bind_port: Port to listen on
             server_name: Server name to display in SMTP responses
             mail_dir: When set, captured message bodies are written to disk
-                under this directory; the session log records the relative
-                path. When None, bodies stay inline in the session log.
+                under this directory and the session log records the
+                relative path. When None, bodies are discarded after
+                metadata (size, truncated flag) is recorded — operators
+                opt *in* to body retention rather than out of it.
         """
         self.bind_ip = bind_ip
         self.bind_port = bind_port
@@ -228,12 +230,18 @@ class SMTPHoneypot:
                                 )
                                 body_entry["body_path"] = rel_path
                             except OSError as e:
+                                # Body storage was requested but failed. Log
+                                # the underlying error and surface it on the
+                                # record; do NOT inline the body bytes here —
+                                # if the operator set MAIL_DIR they
+                                # explicitly chose not to keep bodies in the
+                                # log/DB stream, and an error path should not
+                                # silently override that.
                                 logger.error(f"Failed to write mail body: {e}")
-                                # Fall back to inline so we don't lose the data.
-                                body_entry["data"] = body.decode("utf-8", errors="replace")
                                 body_entry["body_path_error"] = str(e)
-                        else:
-                            body_entry["data"] = body.decode("utf-8", errors="replace")
+                        # If self.mail_dir is unset, only metadata (size,
+                        # truncated) is retained. Operators opt in to body
+                        # retention by setting MAIL_DIR.
                         session_log.append(body_entry)
 
                         if terminator_found:
