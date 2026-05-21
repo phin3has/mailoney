@@ -1,19 +1,34 @@
 """
 Core functionality for the Mailoney SMTP Honeypot
 """
+import re
 import socket
 import threading
 import logging
 import json
 import sys
+import uuid
 import argparse
 from time import strftime
 from typing import Optional, Tuple, Dict, Any, List
 
 from .db import create_session, update_session_data, log_credential, init_db
 from .config import get_settings, configure_logging
+from .mail_storage import store_mail_body
 
 logger = logging.getLogger(__name__)
+
+# Cap on accumulated SMTP message body size. Real spam fits comfortably
+# under this; honeypot value drops fast above 1 MiB and unbounded reads
+# turn into a denial-of-service vector.
+MAX_MAIL_BODY_BYTES = 1_048_576
+
+# End-of-data terminator per RFC 5321 §4.1.1.4. ``\A`` lets an empty
+# body (``.\r\n`` immediately after the 354) terminate correctly. ``\r?``
+# tolerates LF-only clients.
+_DATA_TERMINATOR_RE = re.compile(rb"(?:\r?\n|\A)\.\r?\n")
+# Maximum bytes of overlap to keep when searching across recv() boundaries.
+_DATA_TERMINATOR_TAIL = 4
 
 class SMTPHoneypot:
     """
@@ -21,22 +36,29 @@ class SMTPHoneypot:
     """
     
     def __init__(
-        self, 
+        self,
         bind_ip: str = '0.0.0.0',
         bind_port: int = 25,
-        server_name: str = 'mail.example.com'
+        server_name: str = 'mail.example.com',
+        mail_dir: Optional[str] = None,
     ):
         """
         Initialize the SMTP honeypot server.
-        
+
         Args:
             bind_ip: IP address to bind to
             bind_port: Port to listen on
             server_name: Server name to display in SMTP responses
+            mail_dir: When set, captured message bodies are written to disk
+                under this directory and the session log records the
+                relative path. When None, bodies are discarded after
+                metadata (size, truncated flag) is recorded — operators
+                opt *in* to body retention rather than out of it.
         """
         self.bind_ip = bind_ip
         self.bind_port = bind_port
         self.server_name = server_name
+        self.mail_dir = mail_dir
         self.socket = None
         self.ehlo_response = f'''250 {server_name}
 250-PIPELINING
@@ -104,14 +126,49 @@ class SMTPHoneypot:
             except Exception as e:
                 logger.error(f"Error accepting connection: {e}")
                 
+    def _receive_mail_body(
+        self,
+        recv_fn,
+        max_bytes: int = MAX_MAIL_BODY_BYTES,
+    ) -> Tuple[bytes, bool]:
+        """
+        Read SMTP message body bytes after a 354 response.
+
+        Reads via ``recv_fn(buffer_size)`` until the standard end-of-data
+        terminator (``<CRLF>.<CRLF>`` or the permissive ``\\n.\\n``) is
+        seen, or until ``max_bytes`` have been accumulated, or the peer
+        closes the connection.
+
+        The terminator search spans the chunk boundary by carrying over a
+        small tail from the previous read, so a terminator that lands
+        across two ``recv()`` calls is still detected.
+
+        Returns:
+            (body, terminator_found) — body excludes the terminator if
+            one was matched.
+        """
+        body = bytearray()
+        while len(body) < max_bytes:
+            remaining = max_bytes - len(body)
+            chunk = recv_fn(min(4096, remaining))
+            if not chunk:
+                break
+            search_start = max(0, len(body) - _DATA_TERMINATOR_TAIL)
+            body.extend(chunk)
+            m = _DATA_TERMINATOR_RE.search(bytes(body), search_start)
+            if m:
+                return bytes(body[:m.start()]), True
+        return bytes(body), False
+
     def _handle_client(self, client_socket: socket.socket, addr: Tuple[str, int]) -> None:
         """
         Handle client connection
-        
+
         Args:
             client_socket: Client socket
             addr: Client address tuple (ip, port)
         """
+        session_uuid = str(uuid.uuid4())
         session_record = create_session(
             addr[0], addr[1], self.server_name,
             dest_ip=self.bind_ip,
@@ -162,13 +219,63 @@ class SMTPHoneypot:
                         session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": response})
                         break
                         
-                    # Handle other SMTP commands (simplistic simulation)
-                    elif request.startswith(('mail from:', 'rcpt to:', 'data')):
+                    # MAIL FROM: / RCPT TO: — accept envelope, no body involved.
+                    elif request.startswith(('mail from:', 'rcpt to:')):
                         response = "250 2.1.0 OK\n"
                         client_socket.send(response.encode())
                         session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": response})
                         error_count = 0
-                        
+
+                    # DATA — enter body-receive mode, read until terminator
+                    # or size cap, then return to command mode.
+                    elif request.startswith('data'):
+                        invitation = "354 End data with <CR><LF>.<CR><LF>\n"
+                        client_socket.send(invitation.encode())
+                        session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": invitation})
+
+                        body, terminator_found = self._receive_mail_body(client_socket.recv)
+
+                        body_entry: Dict[str, Any] = {
+                            "timestamp": strftime("%Y-%m-%d %H:%M:%S"),
+                            "direction": "mail-body",
+                            "size": len(body),
+                            "truncated": not terminator_found,
+                        }
+                        if self.mail_dir:
+                            try:
+                                rel_path = store_mail_body(
+                                    self.mail_dir, addr[0], session_uuid, body,
+                                )
+                                body_entry["body_path"] = rel_path
+                            except OSError as e:
+                                # Body storage was requested but failed. Log
+                                # the underlying error and surface it on the
+                                # record; do NOT inline the body bytes here —
+                                # if the operator set MAIL_DIR they
+                                # explicitly chose not to keep bodies in the
+                                # log/DB stream, and an error path should not
+                                # silently override that.
+                                logger.error(f"Failed to write mail body: {e}")
+                                body_entry["body_path_error"] = str(e)
+                        # If self.mail_dir is unset, only metadata (size,
+                        # truncated) is retained. Operators opt in to body
+                        # retention by setting MAIL_DIR.
+                        session_log.append(body_entry)
+
+                        if terminator_found:
+                            response = "250 2.0.0 Ok\n"
+                        elif len(body) >= MAX_MAIL_BODY_BYTES:
+                            response = "552 5.3.4 Message size limit exceeded\n"
+                        else:
+                            # Peer closed mid-body. Connection is effectively gone;
+                            # send a polite close and break.
+                            response = "421 4.4.2 Connection closed\n"
+                        client_socket.send(response.encode())
+                        session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": response})
+                        if not terminator_found:
+                            break
+                        error_count = 0
+
                     # Unknown command
                     else:
                         response = "502 5.5.2 Error: command not recognized\n"
@@ -227,18 +334,28 @@ def parse_args() -> argparse.Namespace:
     )
     
     parser.add_argument(
-        '-d', '--db-url', 
+        '-d', '--db-url',
         default=get_settings().db_url,
         help='Database URL (default: sqlite:///mailoney.db)'
     )
-    
+
     parser.add_argument(
-        '--log-level', 
+        '--mail-dir',
+        default=get_settings().mail_dir,
+        help=(
+            'Directory under which captured SMTP message bodies are written '
+            'as <YYYY-MM-DD>/<src-ip>/<session>.eml. '
+            'When unset, bodies stay inline in the session log.'
+        )
+    )
+
+    parser.add_argument(
+        '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         default=get_settings().log_level,
         help='Log level'
     )
-    
+
     return parser.parse_args()
 
 
@@ -277,7 +394,8 @@ def run_server() -> None:
         server = SMTPHoneypot(
             bind_ip=args.ip,
             bind_port=args.port,
-            server_name=args.server_name
+            server_name=args.server_name,
+            mail_dir=args.mail_dir,
         )
         
         logger.info(f"Starting SMTP Honeypot on {args.ip}:{args.port}")

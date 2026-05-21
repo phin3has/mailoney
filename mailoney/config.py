@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     
     # Database settings
     db_url: str = Field(default="sqlite:///mailoney.db")
-    
+
+    # Filesystem storage for captured mail bodies. Unset = bodies stay
+    # inline in the session log (DB blob / event JSON). When set, bodies
+    # are written under <mail_dir>/<YYYY-MM-DD>/<src-ip>/<session>.eml
+    # and the session log carries only the relative path.
+    mail_dir: Optional[str] = Field(default=None)
+
     # Logging settings
     log_level: str = Field(default="INFO")
     

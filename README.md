@@ -114,6 +114,7 @@ python main.py
 | `MAILONEY_BIND_PORT` | Port to listen on | 25 |
 | `MAILONEY_SERVER_NAME` | SMTP server name | mail.example.com |
 | `MAILONEY_DB_URL` | Database connection URL | sqlite:///mailoney.db |
+| `MAILONEY_MAIL_DIR` | When set, captured SMTP message bodies are written under this directory as `<YYYY-MM-DD>/<src-ip>/<session>.eml` and the session log records the relative path. Unset = bodies are discarded after their metadata (size, truncated flag) is recorded. Operators opt *in* to body retention. | (unset) |
 | `MAILONEY_LOG_LEVEL` | Logging level | INFO |
 
 ### Command-line Arguments
@@ -129,7 +130,30 @@ Available arguments:
 - `-p`, `--port`: Port to listen on
 - `-s`, `--server-name`: Server name to display in SMTP responses
 - `-d`, `--db-url`: Database URL
+- `--mail-dir`: Directory under which captured message bodies are written
 - `--log-level`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+### Captured mail bodies
+
+Mailoney implements the SMTP `DATA` phase: when a client sends `DATA`, the
+server responds with `354 End data with <CR><LF>.<CR><LF>`, reads the
+message body until the standard terminator (or 1 MiB, whichever comes
+first), and replies `250 Ok`.
+
+Storage is opt-in:
+
+- **Default** (`MAILONEY_MAIL_DIR` unset): the body is discarded after
+  the session log records its metadata (`size`, `truncated`). The
+  operator gets a record that a body was received but no body content
+  is retained.
+- **`MAILONEY_MAIL_DIR=/path`**: the body is written to
+  `<path>/<YYYY-MM-DD>/<src-ip>/<session-uuid>.eml` (mode `0640`,
+  directories `0750`) and the session log records the relative path.
+  This is the only way to retain body content; the JSON log stream
+  never carries body bytes inline regardless of `MAILONEY_LOG_JSON`.
+
+Source IPs land in directory names with their colons intact (e.g.
+`2001:db8::1`).
 
 ### Database Configuration
 
