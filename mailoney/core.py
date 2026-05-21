@@ -30,6 +30,12 @@ _DATA_TERMINATOR_RE = re.compile(rb"(?:\r?\n|\A)\.\r?\n")
 # Maximum bytes of overlap to keep when searching across recv() boundaries.
 _DATA_TERMINATOR_TAIL = 4
 
+# Per-connection inactivity timeout, in seconds. Bounds how long a single
+# client can hold a handler thread (and socket) while sending nothing —
+# without it a slow-loris client pins threads indefinitely. A value <= 0
+# disables the timeout.
+DEFAULT_CONN_TIMEOUT = 30
+
 class SMTPHoneypot:
     """
     SMTP Honeypot Server class
@@ -41,6 +47,7 @@ class SMTPHoneypot:
         bind_port: int = 25,
         server_name: str = 'mail.example.com',
         mail_dir: Optional[str] = None,
+        conn_timeout: int = DEFAULT_CONN_TIMEOUT,
     ):
         """
         Initialize the SMTP honeypot server.
@@ -54,11 +61,16 @@ class SMTPHoneypot:
                 relative path. When None, bodies are discarded after
                 metadata (size, truncated flag) is recorded — operators
                 opt *in* to body retention rather than out of it.
+            conn_timeout: Per-connection inactivity timeout in seconds. A
+                client that sends nothing for this long is dropped, so a
+                slow-loris client cannot pin a handler thread. A value
+                <= 0 disables the timeout.
         """
         self.bind_ip = bind_ip
         self.bind_port = bind_port
         self.server_name = server_name
         self.mail_dir = mail_dir
+        self.conn_timeout = conn_timeout
         self.socket = None
         self.ehlo_response = f'''250 {server_name}
 250-PIPELINING
@@ -137,7 +149,8 @@ class SMTPHoneypot:
         Reads via ``recv_fn(buffer_size)`` until the standard end-of-data
         terminator (``<CRLF>.<CRLF>`` or the permissive ``\\n.\\n``) is
         seen, or until ``max_bytes`` have been accumulated, or the peer
-        closes the connection.
+        closes the connection, or ``recv_fn`` raises ``socket.timeout``
+        (the client stalled mid-body).
 
         The terminator search spans the chunk boundary by carrying over a
         small tail from the previous read, so a terminator that lands
@@ -145,12 +158,18 @@ class SMTPHoneypot:
 
         Returns:
             (body, terminator_found) — body excludes the terminator if
-            one was matched.
+            one was matched. ``terminator_found`` is False for a peer
+            close, a size-cap hit, or a recv timeout (truncated body).
         """
         body = bytearray()
         while len(body) < max_bytes:
             remaining = max_bytes - len(body)
-            chunk = recv_fn(min(4096, remaining))
+            try:
+                chunk = recv_fn(min(4096, remaining))
+            except socket.timeout:
+                # Client stalled mid-body. Return what arrived as a
+                # truncated message rather than blocking the thread.
+                break
             if not chunk:
                 break
             search_start = max(0, len(body) - _DATA_TERMINATOR_TAIL)
@@ -175,7 +194,15 @@ class SMTPHoneypot:
             dest_port=self.bind_port
         )
         session_log = []
-        
+
+        # Bound the lifetime of an idle connection. With a timeout set,
+        # recv()/send() raise socket.timeout after this many seconds of
+        # inactivity, so a client that connects and then sends nothing
+        # (slow-loris) cannot pin this handler thread forever. A value
+        # <= 0 leaves the socket in its default blocking mode.
+        if self.conn_timeout and self.conn_timeout > 0:
+            client_socket.settimeout(self.conn_timeout)
+
         try:
             # Send banner
             banner = f"220 {self.server_name} ESMTP Service Ready\n"
@@ -283,6 +310,22 @@ class SMTPHoneypot:
                         session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": response})
                         error_count += 1
                         
+                except socket.timeout:
+                    # Idle longer than conn_timeout. Drop the connection
+                    # so the handler thread is freed; the 421 reply is
+                    # best-effort since the peer may already be gone.
+                    logger.info(
+                        f"Connection from {addr[0]}:{addr[1]} timed out after "
+                        f"{self.conn_timeout}s of inactivity"
+                    )
+                    timeout_reply = "421 4.4.2 Connection timed out\n"
+                    try:
+                        client_socket.send(timeout_reply.encode())
+                    except OSError:
+                        pass
+                    session_log.append({"timestamp": strftime("%Y-%m-%d %H:%M:%S"), "direction": "out", "data": timeout_reply})
+                    break
+
                 except Exception as e:
                     logger.error(f"Error handling client request: {e}")
                     error_count += 1
@@ -350,6 +393,17 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        '--conn-timeout',
+        type=int,
+        default=get_settings().conn_timeout,
+        help=(
+            'Per-connection inactivity timeout in seconds. A client that '
+            'sends nothing for this long is dropped, bounding slow-loris '
+            'style abuse. 0 disables it. (default: 30)'
+        )
+    )
+
+    parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         default=get_settings().log_level,
@@ -396,6 +450,7 @@ def run_server() -> None:
             bind_port=args.port,
             server_name=args.server_name,
             mail_dir=args.mail_dir,
+            conn_timeout=args.conn_timeout,
         )
         
         logger.info(f"Starting SMTP Honeypot on {args.ip}:{args.port}")

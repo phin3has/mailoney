@@ -19,7 +19,13 @@ class Settings(BaseSettings):
     bind_ip: str = Field(default="0.0.0.0")
     bind_port: int = Field(default=25)
     server_name: str = Field(default="mail.example.com")
-    
+
+    # Per-connection inactivity timeout in seconds. A client that neither
+    # sends a command nor advances the DATA body within this window is
+    # dropped, so slow-loris connections cannot pin handler threads.
+    # 0 or negative disables the timeout (not recommended).
+    conn_timeout: int = Field(default=30)
+
     # Database settings
     db_url: str = Field(default="sqlite:///mailoney.db")
 
