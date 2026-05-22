@@ -45,6 +45,8 @@ logs/
 # Environment variables
 .env
 .env.*
+# ...but the example config is meant to be committed.
+!.env.example
 
 # Docker
 .docker/
