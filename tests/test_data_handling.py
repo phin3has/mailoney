@@ -5,6 +5,7 @@ Tests for the SMTP DATA-phase implementation:
   * the filesystem storage helper (`mail_storage.store_mail_body`)
 """
 import os
+import socket
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,21 @@ def _make_recv(*chunks: bytes):
             return chunk
         queue.insert(0, chunk[size:])
         return chunk[:size]
+
+    return _recv
+
+
+def _make_recv_then_timeout(*chunks: bytes):
+    """A recv-shaped callable that yields the given chunks, then raises
+    ``socket.timeout`` — simulating a client that stalls mid-body once the
+    socket has an inactivity timeout set.
+    """
+    queue = list(chunks)
+
+    def _recv(size: int) -> bytes:
+        if queue:
+            return queue.pop(0)
+        raise socket.timeout()
 
     return _recv
 
@@ -116,6 +132,18 @@ def test_receive_body_command_like_content_is_not_interpreted(honeypot):
     assert found is True
     assert b"QUIT" in body
     assert b"EHLO" in body
+
+
+def test_receive_body_recv_timeout_truncates(honeypot):
+    """A recv() timeout mid-body yields a truncated result, not a hang.
+
+    Without this the handler thread blocks forever on a stalled client.
+    """
+    body, found = honeypot._receive_mail_body(
+        _make_recv_then_timeout(b"partial body before the client stalled")
+    )
+    assert found is False
+    assert body == b"partial body before the client stalled"
 
 
 # --- mail_storage --------------------------------------------------------

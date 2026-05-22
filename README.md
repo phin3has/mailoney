@@ -113,6 +113,7 @@ python main.py
 | `MAILONEY_BIND_IP` | IP address to bind to | 0.0.0.0 |
 | `MAILONEY_BIND_PORT` | Port to listen on | 25 |
 | `MAILONEY_SERVER_NAME` | SMTP server name | mail.example.com |
+| `MAILONEY_CONN_TIMEOUT` | Per-connection inactivity timeout (seconds). A client that sends nothing for this long is dropped, so slow-loris connections cannot pin handler threads. `0` disables it. | 30 |
 | `MAILONEY_DB_URL` | Database connection URL | sqlite:///mailoney.db |
 | `MAILONEY_MAIL_DIR` | When set, captured SMTP message bodies are written under this directory as `<YYYY-MM-DD>/<src-ip>/<session>.eml` and the session log records the relative path. Unset = bodies are discarded after their metadata (size, truncated flag) is recorded. Operators opt *in* to body retention. | (unset) |
 | `MAILONEY_LOG_LEVEL` | Logging level | INFO |
@@ -129,6 +130,7 @@ Available arguments:
 - `-i`, `--ip`: IP address to bind to
 - `-p`, `--port`: Port to listen on
 - `-s`, `--server-name`: Server name to display in SMTP responses
+- `--conn-timeout`: Per-connection inactivity timeout in seconds (0 disables it)
 - `-d`, `--db-url`: Database URL
 - `--mail-dir`: Directory under which captured message bodies are written
 - `--log-level`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
