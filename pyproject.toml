@@ -30,7 +30,7 @@ dependencies = [
 "Bug Tracker" = "https://github.com/phin3has/mailoney/issues"
 
 [project.scripts]
-mailoney = "main:main"
+mailoney = "mailoney:run_server"
 
 [tool.pytest.ini_options]
 addopts = "-ra -q"
