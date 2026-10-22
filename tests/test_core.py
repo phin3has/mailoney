@@ -157,7 +157,7 @@ def test_full_session_summary_and_transcript(event_stream):
     assert s["last_response_code"] == 221
     assert s["command_count"] == 6
     assert s["commands"][0] == "ehlo probe" and s["commands"][-1] == "quit"
-    assert s["credentials"] == ["dgvzda=="]  # lowercased by the pre-existing parser
+    assert s["credentials"] == ["dGVzdA=="]  # original case is preserved
     # "Subject: hi\r\n\r\nhello" = 20 bytes; the terminator is excluded.
     assert s["mail"] == [{"size": 20, "truncated": False}]
     assert s["mail_size"] == 20
@@ -209,3 +209,51 @@ def test_session_events_share_uuid(event_stream):
     evs = event_stream()
     assert [e["event"] for e in evs] == ["session_started", "credential_captured", "session_ended"]
     assert len({e["session_uuid"] for e in evs}) == 1
+
+
+# --- authentication handling ------------------------------------------
+
+def _run(*chunks):
+    sock = _mock_socket(*chunks)
+    h = SMTPHoneypot(bind_ip="127.0.0.1", bind_port=8025)
+    with patch("mailoney.core.update_session_data"):
+        h._handle_client(sock, ("10.0.0.1", 4444))
+    return [c.args[0].decode() for c in sock.send.call_args_list]
+
+
+def test_auth_plain_preserves_case(event_stream):
+    # base64 is case-sensitive: "\0testuser\0Passw0rd!"
+    blob = "AHRlc3R1c2VyAFBhc3N3MHJkIQ=="
+    _run(b"EHLO x\r\n", f"AUTH PLAIN {blob}\r\n".encode(), b"QUIT\r\n")
+    assert _session_ended(event_stream)["credentials"] == [blob]
+
+
+def test_failed_auth_uses_535_not_235(event_stream):
+    replies = _run(b"AUTH PLAIN dGVzdA==\r\n", b"QUIT\r\n")
+    assert any(r.startswith("535 ") for r in replies)
+    assert not any(r.startswith("235 ") for r in replies)
+
+
+def test_auth_login_two_step_exchange(event_stream):
+    # username "testuser", password "Passw0rd!"
+    replies = _run(b"EHLO x\r\n", b"AUTH LOGIN\r\n", b"dGVzdHVzZXI=\r\n",
+                   b"UGFzc3cwcmQh\r\n", b"QUIT\r\n")
+    assert "334 VXNlcm5hbWU6\n" in replies      # "Username:"
+    assert "334 UGFzc3dvcmQ6\n" in replies      # "Password:"
+    assert any(r.startswith("535 ") for r in replies)
+    assert not any(r.startswith("502 ") for r in replies)
+    # Stored in the same shape as AUTH PLAIN, original case intact.
+    assert _session_ended(event_stream)["credentials"] == ["AHRlc3R1c2VyAFBhc3N3MHJkIQ=="]
+
+
+def test_auth_login_username_on_same_line(event_stream):
+    replies = _run(b"AUTH LOGIN dGVzdHVzZXI=\r\n", b"UGFzc3cwcmQh\r\n", b"QUIT\r\n")
+    assert "334 UGFzc3dvcmQ6\n" in replies
+    assert _session_ended(event_stream)["credentials"] == ["AHRlc3R1c2VyAFBhc3N3MHJkIQ=="]
+
+
+def test_auth_login_answers_are_not_treated_as_commands(event_stream):
+    # A password that happens to look like a command must not be run as one.
+    replies = _run(b"AUTH LOGIN\r\n", b"dXNlcg==\r\n", b"quit\r\n", b"QUIT\r\n")
+    assert sum(r.startswith("221 ") for r in replies) == 1   # only the real QUIT
+    assert _session_ended(event_stream)["command_count"] == 4
