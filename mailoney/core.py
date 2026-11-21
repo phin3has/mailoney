@@ -391,12 +391,19 @@ class SMTPHoneypot:
                     # are not commands, so they must be handled before the
                     # command matching below.
                     if auth_login_state == 1:
-                        auth_login_user = request_raw
-                        auth_login_state = 2
-                        send("334 UGFzc3dvcmQ6\n")  # "Password:"
+                        if request_raw == "*":
+                            auth_login_state = 0
+                            send("501 5.7.0 Authentication canceled\n")
+                        else:
+                            auth_login_user = request_raw
+                            auth_login_state = 2
+                            send("334 UGFzc3dvcmQ6\n")  # "Password:"
                         continue
                     if auth_login_state == 2:
                         auth_login_state = 0
+                        if request_raw == "*":
+                            send("501 5.7.0 Authentication canceled\n")
+                            continue
                         auth_string = _auth_login_to_plain(auth_login_user, request_raw)
                         metrics.CREDENTIALS_CAPTURED_TOTAL.inc()
                         credentials.append(auth_string)
@@ -452,9 +459,13 @@ class SMTPHoneypot:
                         parts = request_raw.split()
                         if len(parts) >= 3:
                             # Username sent on the same line: AUTH LOGIN <user>
-                            auth_login_user = parts[2]
-                            auth_login_state = 2
-                            send("334 UGFzc3dvcmQ6\n")  # "Password:"
+                            if parts[2] == "*":
+                                auth_login_state = 0
+                                send("501 5.7.0 Authentication canceled\n")
+                            else:
+                                auth_login_user = parts[2]
+                                auth_login_state = 2
+                                send("334 UGFzc3dvcmQ6\n")  # "Password:"
                         else:
                             auth_login_state = 1
                             send("334 VXNlcm5hbWU6\n")  # "Username:"
