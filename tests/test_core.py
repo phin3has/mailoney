@@ -257,3 +257,26 @@ def test_auth_login_answers_are_not_treated_as_commands(event_stream):
     replies = _run(b"AUTH LOGIN\r\n", b"dXNlcg==\r\n", b"quit\r\n", b"QUIT\r\n")
     assert sum(r.startswith("221 ") for r in replies) == 1   # only the real QUIT
     assert _session_ended(event_stream)["command_count"] == 4
+
+
+def test_auth_login_username_cancel_skips_capture(event_stream):
+    replies = _run(b"AUTH LOGIN\r\n", b"* \r\n", b"QUIT\r\n")
+    assert "501 5.7.0 Authentication canceled\n" in replies
+    assert _session_ended(event_stream).get("credentials", []) == []
+
+
+def test_auth_login_password_cancel_skips_capture(event_stream):
+    replies = _run(
+        b"AUTH LOGIN\r\n",
+        b"dXNlcg==\r\n",
+        b"* \r\n",
+        b"QUIT\r\n",
+    )
+    assert "501 5.7.0 Authentication canceled\n" in replies
+    assert _session_ended(event_stream).get("credentials", []) == []
+
+
+def test_auth_login_same_line_username_cancel_skips_capture(event_stream):
+    replies = _run(b"AUTH LOGIN *\r\n", b"QUIT\r\n")
+    assert "501 5.7.0 Authentication canceled\n" in replies
+    assert _session_ended(event_stream).get("credentials", []) == []
