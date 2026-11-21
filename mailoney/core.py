@@ -1,6 +1,8 @@
 """
 Core functionality for the Mailoney SMTP Honeypot
 """
+import base64
+import binascii
 import os
 import re
 import socket
@@ -54,6 +56,22 @@ DEFAULT_CONN_TIMEOUT = 30
 # The count keeps going past this; only the list stops growing, so a
 # client that pipes thousands of EHLOs cannot inflate a single log line.
 MAX_LOGGED_COMMANDS = 200
+
+def _auth_login_to_plain(user_b64: str, password_b64: str) -> str:
+    """Combine the two AUTH LOGIN answers into the AUTH PLAIN blob.
+
+    AUTH PLAIN carries ``base64("\\0user\\0password")`` on one line, so
+    storing AUTH LOGIN captures in the same shape keeps every captured
+    credential decodable the same way. If either part is not valid base64,
+    fall back to ``user:password`` as received so nothing is lost.
+    """
+    try:
+        user = base64.b64decode(user_b64, validate=True)
+        password = base64.b64decode(password_b64, validate=True)
+    except (binascii.Error, ValueError):
+        return f"{user_b64}:{password_b64}"
+    return base64.b64encode(b"\x00" + user + b"\x00" + password).decode()
+
 
 class SMTPHoneypot:
     """
@@ -344,9 +362,17 @@ class SMTPHoneypot:
 
             # Handle client commands
             error_count = 0
+            # AUTH LOGIN is a two-step exchange: 0 = idle, 1 = waiting for
+            # the username, 2 = waiting for the password.
+            auth_login_state = 0
+            auth_login_user = ""
             while error_count < 10:
                 try:
-                    request = client_socket.recv(4096).decode().strip().lower()
+                    # Keep the client's original text: credentials are base64,
+                    # which is case-sensitive. Commands are matched on the
+                    # lowercase copy.
+                    request_raw = client_socket.recv(4096).decode().strip()
+                    request = request_raw.lower()
                     if not request:
                         break
 
@@ -360,6 +386,25 @@ class SMTPHoneypot:
                     metrics.COMMANDS_TOTAL.labels(
                         command=metrics.classify_command(request)
                     ).inc()
+
+                    # Second and third lines of an AUTH LOGIN exchange. These
+                    # are not commands, so they must be handled before the
+                    # command matching below.
+                    if auth_login_state == 1:
+                        auth_login_user = request_raw
+                        auth_login_state = 2
+                        send("334 UGFzc3dvcmQ6\n")  # "Password:"
+                        continue
+                    if auth_login_state == 2:
+                        auth_login_state = 0
+                        auth_string = _auth_login_to_plain(auth_login_user, request_raw)
+                        metrics.CREDENTIALS_CAPTURED_TOTAL.inc()
+                        credentials.append(auth_string)
+                        events.credential_captured(session_uuid, auth_string)
+                        log_credential(session_record.id, auth_string)
+                        logger.info(f"Captured credential: {auth_string}")
+                        send("535 5.7.8 Authentication failed\n")
+                        continue
 
                     # Handle EHLO/HELO. Use the post-TLS variant once a
                     # STARTTLS upgrade has succeeded (no STARTTLS line).
@@ -403,9 +448,20 @@ class SMTPHoneypot:
                                 break
 
                     # Handle AUTH
+                    elif request.startswith('auth login'):
+                        parts = request_raw.split()
+                        if len(parts) >= 3:
+                            # Username sent on the same line: AUTH LOGIN <user>
+                            auth_login_user = parts[2]
+                            auth_login_state = 2
+                            send("334 UGFzc3dvcmQ6\n")  # "Password:"
+                        else:
+                            auth_login_state = 1
+                            send("334 VXNlcm5hbWU6\n")  # "Username:"
+
                     elif request.startswith('auth plain'):
-                        # Extract auth string
-                        parts = request.split()
+                        # Extract auth string from the original-case text
+                        parts = request_raw.split()
                         if len(parts) >= 3:
                             auth_string = parts[2]
                             metrics.CREDENTIALS_CAPTURED_TOTAL.inc()
@@ -414,7 +470,7 @@ class SMTPHoneypot:
                             log_credential(session_record.id, auth_string)
                             logger.info(f"Captured credential: {auth_string}")
 
-                        send("235 2.7.0 Authentication failed\n")
+                        send("535 5.7.8 Authentication failed\n")
 
                     # Handle QUIT
                     elif request.startswith('quit'):
